@@ -1,0 +1,48 @@
+name: homeserver
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: homebase-db
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./postgres/data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: homebase
+      POSTGRES_USER: homebase
+      POSTGRES_PASSWORD: pass123
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homebase"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - homebase
+
+  dashboard:
+    build: .
+    container_name: homebase-api
+    restart: unless-stopped
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/app/project
+      - ./runtime:/app/data
+      - c:/:/hostfs/c:ro
+      - d:/:/hostfs/d:ro
+      - e:/:/hostfs/e:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+    networks:
+      - homebase
+
+networks:
+  homebase:
+    driver: bridge

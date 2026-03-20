@@ -1,0 +1,93 @@
+using HomeBase.API.Models;
+using HomeBase.API.Services;
+using Microsoft.AspNetCore.Mvc;
+
+namespace HomeBase.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class ServicesController : ControllerBase
+{
+    private readonly ServiceManagementService _svcMgmt;
+    private readonly ComposeParserService _composeParser;
+
+    public ServicesController(ServiceManagementService svcMgmt, ComposeParserService composeParser)
+    {
+        _svcMgmt = svcMgmt;
+        _composeParser = composeParser;
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetAll()
+    {
+        var services = await _svcMgmt.GetAllAsync();
+        var response = services.Select(s => new ServiceResponse(
+            s.Id, s.Name, s.Description, s.Icon, s.Color,
+            s.ContainerName, s.PreferPort, s.UrlPath, s.IsEnabled,
+            s.SortOrder, s.ComposeName, s.Image, s.BuildContext,
+            s.EnvFile, s.IsAutoDiscovered, s.Category?.Name, s.CategoryId,
+            s.ServiceSlug, s.ComposeFilePath
+        ));
+        return Ok(response);
+    }
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> Get(int id)
+    {
+        var svc = await _svcMgmt.GetByIdAsync(id);
+        if (svc == null) return NotFound();
+        return Ok(new ServiceResponse(
+            svc.Id, svc.Name, svc.Description, svc.Icon, svc.Color,
+            svc.ContainerName, svc.PreferPort, svc.UrlPath, svc.IsEnabled,
+            svc.SortOrder, svc.ComposeName, svc.Image, svc.BuildContext,
+            svc.EnvFile, svc.IsAutoDiscovered, svc.Category?.Name, svc.CategoryId,
+            svc.ServiceSlug, svc.ComposeFilePath
+        ));
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] Service svc)
+    {
+        var created = await _svcMgmt.CreateAsync(svc);
+        return Ok(created);
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, [FromBody] Service updated)
+    {
+        var svc = await _svcMgmt.UpdateAsync(id, updated);
+        if (svc == null) return NotFound();
+        return Ok(svc);
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var result = await _svcMgmt.DeleteServiceAsync(id);
+        if (!result.Ok && result.Error == "Service not found") return NotFound();
+        return Ok(result);
+    }
+
+    /// Sync compose definitions to DB — discovers new services, removes orphans
+    [HttpPost("sync")]
+    public async Task<IActionResult> SyncCompose()
+    {
+        var result = await _svcMgmt.SyncComposeToDbAsync();
+        return Ok(result);
+    }
+
+    /// Get parsed compose data
+    [HttpGet("compose")]
+    public IActionResult GetCompose()
+    {
+        var defs = _composeParser.ParseAll();
+        // Also include infra
+        defs.AddRange(_composeParser.ParseInfra());
+        var response = defs.Select(d => new ComposeServiceResponse(
+            d.ComposeName, d.ContainerName, d.Image, d.BuildContext,
+            d.Ports, d.EnvFiles, d.Environment, d.Volumes,
+            d.DependsOn, d.RestartPolicy
+        ));
+        return Ok(response);
+    }
+}
