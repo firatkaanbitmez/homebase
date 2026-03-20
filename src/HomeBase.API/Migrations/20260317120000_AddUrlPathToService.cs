@@ -16,11 +16,6 @@ namespace HomeBase.API.Migrations
                 type: "text",
                 nullable: true);
 
-            migrationBuilder.Sql(@"
-                INSERT INTO ""Services"" (""Name"", ""Description"", ""Icon"", ""Color"", ""ContainerName"", ""UrlPath"", ""IsEnabled"", ""SortOrder"", ""CreatedAt"", ""UpdatedAt"")
-                SELECT 'Web Element Tracker', 'Web elementleri takip et - fiyat, stok, içerik değişimi', '/icons/web-element-tracker.svg', '#6366f1', 'web-element-tracker', '/admin', true, 16, NOW(), NOW()
-                WHERE NOT EXISTS (SELECT 1 FROM ""Services"" WHERE ""ContainerName"" = 'web-element-tracker');
-            ");
         }
 
         /// <inheritdoc />
