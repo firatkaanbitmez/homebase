@@ -6,6 +6,7 @@ let disksData = []; // disk usage for settings health dashboard
 const cpuH = [], memH = [], HLEN = 60;
 let viewMode = localStorage.getItem('viewMode') || 'grid';
 const transitioning = new Set();
+const deletingServiceIds = new Set(); // guard for delete race condition
 let searchQuery = '';
 let initialLoad = true;
 let consecutiveErrors = 0;
@@ -56,7 +57,7 @@ async function fetchAll() {
             fetch('/api/System/disks')
         ]);
         if (!s.ok || !c.ok) throw new Error(t('msg.apiDown'));
-        services = (await s.json()).filter(svc => svc.isEnabled !== false);
+        services = (await s.json()).filter(svc => svc.isEnabled !== false && !deletingServiceIds.has(svc.id));
         containers = await c.json();
         disksData = await d.json();
         renderDisks(disksData);
@@ -129,18 +130,28 @@ function initSignalR() {
     });
 
     connection.on('ServicesUpdated', data => {
-        services = data.filter(svc => svc.isEnabled !== false);
+        services = data.filter(svc => svc.isEnabled !== false && !deletingServiceIds.has(svc.id));
         renderServices();
     });
 
     connection.on('DeployProgress', data => {
-        if (data.status === 'deploying') {
-            showToast(`${data.slug} deploying...`, 'info');
-        } else if (data.status === 'ready') {
-            showToast(`${data.slug} deployed successfully`, 'success');
-            fetchAll();
-        } else if (data.status === 'failed') {
-            showToast(`${data.slug} deploy failed: ${data.message || ''}`, 'error');
+        // Update deploy panel if active — panel handles its own UI
+        const panelActive = typeof activeDeploy !== 'undefined' && activeDeploy && activeDeploy.slug === data.slug;
+        if (panelActive) {
+            updateDeployFromSignalR(data);
+        }
+        // Show toasts only when deploy panel is NOT handling this deploy
+        if (!panelActive) {
+            if (data.status === 'deploying') {
+                showToast(`${data.slug} ${t('msg.deployingSlug')}`, 'info');
+            } else if (data.status === 'ready') {
+                showToast(`${data.slug} ${t('msg.deployOkSlug')}`, 'success');
+            } else if (data.status === 'failed') {
+                showToast(`${data.slug} ${t('msg.deployFailSlug')}: ${data.message || ''}`, 'error');
+            }
+        }
+        // Always refresh data on terminal states
+        if (data.status === 'ready' || data.status === 'failed') {
             fetchAll();
         }
     });
@@ -185,9 +196,9 @@ function setLiveStatus(status) {
     pill.classList.remove('connected', 'reconnecting', 'disconnected');
     pill.classList.add(status);
     if (label) {
-        if (status === 'connected') label.textContent = 'LIVE';
-        else if (status === 'reconnecting') label.textContent = 'RECONNECTING';
-        else label.textContent = 'OFFLINE';
+        if (status === 'connected') label.textContent = t('topbar.live');
+        else if (status === 'reconnecting') label.textContent = t('topbar.reconnecting');
+        else label.textContent = t('topbar.offline');
     }
 }
 

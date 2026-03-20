@@ -93,7 +93,8 @@ public record DeployRequest(
     string Name, string? Image, string? BuildContext, string? ComposeName,
     Dictionary<string, string>? Ports, Dictionary<string, string>? EnvVars,
     List<string>? Volumes, string? Category, string? Description,
-    List<string>? DependsOn, Dictionary<string, string>? Environment
+    List<string>? DependsOn, Dictionary<string, string>? Environment,
+    string? Icon = null, string? Color = null
 );
 
 public record DeployResponse(bool Ok, string? ContainerName, string? Error);
@@ -126,6 +127,27 @@ public record AiPortMapping(int Host, int Container);
 public record DirectoryEntry(string Name, string Path, bool HasSubdirs, bool IsProject);
 public record AiStatusResponse(bool Enabled, bool HasApiKey, string Model);
 public record WriteDockerfileRequest(string ProjectPath, string Content);
+
+public record FixRedeployRequest(string ServiceSlug, string? FixedYaml);
+
+// Agent Fix DTOs
+public record AgentFixRequest(
+    string ServiceSlug,
+    List<PreviousAttempt>? PreviousAttempts = null,
+    string? UserInstruction = null,
+    string? Language = null
+);
+public record PreviousAttempt(string FixDescription, string ResultLogs);
+
+public record AgentFixResponse(
+    string Reasoning,
+    AgentFix? Fix,
+    string? UserActionRequired
+);
+public record AgentFix(string Type, string Content, string Description);
+
+public record ComposeUpdateRequest(string Yaml);
+public record ComposeAiAssistRequest(string? Yaml = null, string? Instruction = null);
 
 public record PortAccessEntry(
     int Port, string Protocol, string? ServiceName, string? ContainerName,

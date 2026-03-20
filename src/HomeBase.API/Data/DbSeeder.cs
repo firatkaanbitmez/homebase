@@ -24,13 +24,15 @@ public static class DbSeeder
         // Seed default settings (only on first run)
         if (!await db.Settings.AnyAsync())
         {
-            int order = 0;
-            db.Settings.Add(new Setting
-            {
-                Section = "General", Key = "HOST_IP", Value = "",
-                IsSecret = false, SortOrder = order++, Description = "Host machine IP address"
-            });
             db.AuditLogs.Add(new AuditLog { Action = "system", Target = "seed", Details = "Default settings created" });
+            await db.SaveChangesAsync();
+        }
+
+        // Remove legacy HOST_IP setting if present
+        var hostIp = await db.Settings.FirstOrDefaultAsync(s => s.Key == "HOST_IP");
+        if (hostIp != null)
+        {
+            db.Settings.Remove(hostIp);
             await db.SaveChangesAsync();
         }
 
@@ -41,11 +43,53 @@ public static class DbSeeder
             db.Settings.AddRange(
                 new Setting { Section = "AI Configuration", Key = "AI_ENABLED", Value = "false",
                               IsSecret = false, SortOrder = aiOrder++, Description = "Enable AI features" },
-                new Setting { Section = "AI Configuration", Key = "OPENAI_API_KEY", Value = "",
-                              IsSecret = true, SortOrder = aiOrder++, Description = "OpenAI API Key" },
+                new Setting { Section = "AI Configuration", Key = "AI_PROVIDER", Value = "openai",
+                              IsSecret = false, SortOrder = aiOrder++, Description = "AI Provider (openai, gemini, claude, custom)" },
+                new Setting { Section = "AI Configuration", Key = "AI_API_KEY", Value = "",
+                              IsSecret = true, SortOrder = aiOrder++, Description = "AI API Key" },
                 new Setting { Section = "AI Configuration", Key = "AI_MODEL", Value = "gpt-4.1-mini",
-                              IsSecret = false, SortOrder = aiOrder++, Description = "AI model" }
+                              IsSecret = false, SortOrder = aiOrder++, Description = "AI model" },
+                new Setting { Section = "AI Configuration", Key = "AI_BASE_URL", Value = "",
+                              IsSecret = false, SortOrder = aiOrder++, Description = "Custom AI base URL (for custom provider)" }
             );
+            await db.SaveChangesAsync();
+        }
+
+        // Migrate OPENAI_API_KEY → AI_API_KEY if needed
+        var oldApiKey = await db.Settings.FirstOrDefaultAsync(s => s.Key == "OPENAI_API_KEY");
+        if (oldApiKey != null)
+        {
+            var newApiKey = await db.Settings.FirstOrDefaultAsync(s => s.Key == "AI_API_KEY");
+            if (newApiKey == null)
+            {
+                oldApiKey.Key = "AI_API_KEY";
+                oldApiKey.Description = "AI API Key";
+            }
+            else if (!string.IsNullOrEmpty(oldApiKey.Value) && string.IsNullOrEmpty(newApiKey.Value))
+            {
+                newApiKey.Value = oldApiKey.Value;
+                db.Settings.Remove(oldApiKey);
+            }
+            else
+            {
+                db.Settings.Remove(oldApiKey);
+            }
+            await db.SaveChangesAsync();
+        }
+
+        // Ensure AI_PROVIDER and AI_BASE_URL exist (for existing installations)
+        if (!await db.Settings.AnyAsync(s => s.Key == "AI_PROVIDER"))
+        {
+            var aiOrder = await db.Settings.CountAsync();
+            db.Settings.Add(new Setting { Section = "AI Configuration", Key = "AI_PROVIDER", Value = "openai",
+                              IsSecret = false, SortOrder = aiOrder, Description = "AI Provider (openai, gemini, claude, custom)" });
+            await db.SaveChangesAsync();
+        }
+        if (!await db.Settings.AnyAsync(s => s.Key == "AI_BASE_URL"))
+        {
+            var aiOrder = await db.Settings.CountAsync();
+            db.Settings.Add(new Setting { Section = "AI Configuration", Key = "AI_BASE_URL", Value = "",
+                              IsSecret = false, SortOrder = aiOrder, Description = "Custom AI base URL (for custom provider)" });
             await db.SaveChangesAsync();
         }
     }

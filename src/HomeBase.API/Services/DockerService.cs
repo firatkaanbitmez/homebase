@@ -531,7 +531,7 @@ public class DockerService
         await db.SaveChangesAsync();
     }
 
-    public (bool ok, string? error) RunShell(string command, int timeoutMs)
+    public (bool ok, string? output) RunShell(string command, int timeoutMs)
     {
         var shell = OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sh";
         var args = OperatingSystem.IsWindows() ? $"/c {command}" : $"-c \"{command.Replace("\"", "\\\"")}\"";
@@ -543,10 +543,13 @@ public class DockerService
             CreateNoWindow = true
         };
         using var proc = Process.Start(psi)!;
+        var stdout = proc.StandardOutput.ReadToEnd();
         var stderr = proc.StandardError.ReadToEnd();
         proc.WaitForExit(timeoutMs);
         var ok = proc.ExitCode == 0;
         if (!ok) _logger.LogWarning("Shell command failed: {Cmd} → {Err}", command, stderr);
-        return (ok, ok ? null : stderr);
+        // Return combined stdout+stderr (docker logs writes to both streams)
+        var combined = $"{stdout}{stderr}".Trim();
+        return (ok, string.IsNullOrWhiteSpace(combined) ? null : combined);
     }
 }

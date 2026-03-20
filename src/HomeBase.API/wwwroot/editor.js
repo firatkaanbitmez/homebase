@@ -71,36 +71,49 @@ async function openServiceEditor(id) {
             }).join('')}`;
     }
 
+    const hasCompose = isEdit && data.serviceSlug;
+
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay panel-right';
     overlay.innerHTML = `
         <div class="modal">
             <h3>${isEdit ? t('editor.title') : t('editor.addTitle')}</h3>
-            <div class="svc-form" style="max-height:70vh;overflow-y:auto;padding-right:.3rem">
-                <div class="svc-form-divider">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
-                    ${t('editor.info')}
-                </div>
-                <div class="svc-form-row"><label>${t('editor.name')}</label><input id="svcName" value="${escHtml(data.name||'')}"></div>
-                <div class="svc-form-row"><label>${t('editor.desc')}</label><input id="svcDesc" value="${escHtml(data.description||'')}"></div>
-                <div class="svc-form-grid">
-                    <div class="svc-form-row"><label>${t('editor.icon')}</label>
-                        <div class="icon-input-row">
-                            <input id="svcIcon" value="${escHtml(data.icon||'')}" style="flex:1">
-                            <button type="button" class="icon-picker-btn" onclick="openIconPicker(this.parentElement.querySelector('#svcIcon'),this.parentElement.querySelector('.icon-preview'))">${t('editor.pickIcon')}</button>
-                            <img class="icon-preview" src="${escHtml(data.icon||'')}" alt="" style="${data.icon ? '' : 'display:none'}" onerror="this.style.display='none'">
-                        </div>
+            ${hasCompose ? `<div class="editor-tabs">
+                <button class="editor-tab active" data-edtab="settings">${t('editor.settingsTab')}</button>
+                <button class="editor-tab" data-edtab="compose">${t('editor.composeTab')}</button>
+            </div>` : ''}
+            <div class="editor-tab-panel active" data-edpanel="settings">
+                <div class="svc-form" style="max-height:70vh;overflow-y:auto;padding-right:.3rem">
+                    <div class="svc-form-divider">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                        ${t('editor.info')}
                     </div>
-                    <div class="svc-form-row"><label>${t('editor.color')}</label><input id="svcColor" type="color" value="${(data.color && /^#[0-9a-fA-F]{6}$/.test(data.color)) ? data.color : '#6366f1'}"></div>
+                    <div class="svc-form-row"><label>${t('editor.name')}</label><input id="svcName" value="${escHtml(data.name||'')}"></div>
+                    <div class="svc-form-row"><label>${t('editor.desc')}</label><input id="svcDesc" value="${escHtml(data.description||'')}"></div>
+                    <div class="svc-form-grid">
+                        <div class="svc-form-row"><label>${t('editor.icon')}</label>
+                            <div class="icon-input-row">
+                                <input id="svcIcon" value="${escHtml(data.icon||'')}" style="flex:1">
+                                <button type="button" class="icon-picker-btn" onclick="openIconPicker(this.parentElement.querySelector('#svcIcon'),this.parentElement.querySelector('.icon-preview'))">${t('editor.pickIcon')}</button>
+                                <img class="icon-preview" src="${escHtml(data.icon||'')}" alt="" style="${data.icon ? '' : 'display:none'}" onerror="this.style.display='none'">
+                            </div>
+                        </div>
+                        <div class="svc-form-row"><label>${t('editor.color')}</label><input id="svcColor" type="color" value="${(data.color && /^#[0-9a-fA-F]{6}$/.test(data.color)) ? data.color : '#6366f1'}"></div>
+                    </div>
+                    <div class="svc-form-row"><label>${t('editor.container')}</label><input id="svcContainer" value="${escHtml(data.containerName||'')}"></div>
+                    <div class="svc-form-grid">
+                        <div class="svc-form-row"><label>${t('editor.preferPort')}</label><input id="svcPort" type="number" value="${data.preferPort||''}"></div>
+                        <div class="svc-form-row"><label>${t('editor.urlPath')}</label><input id="svcUrlPath" value="${escHtml(data.urlPath||'')}"></div>
+                    </div>
+                    <div class="svc-form-row"><label>${t('editor.sort')}</label><input id="svcSort" type="number" value="${data.sortOrder||0}"></div>
+                    ${envSettingsHtml}
                 </div>
-                <div class="svc-form-row"><label>${t('editor.container')}</label><input id="svcContainer" value="${escHtml(data.containerName||'')}"></div>
-                <div class="svc-form-grid">
-                    <div class="svc-form-row"><label>${t('editor.preferPort')}</label><input id="svcPort" type="number" value="${data.preferPort||''}"></div>
-                    <div class="svc-form-row"><label>${t('editor.urlPath')}</label><input id="svcUrlPath" value="${escHtml(data.urlPath||'')}"></div>
-                </div>
-                <div class="svc-form-row"><label>${t('editor.sort')}</label><input id="svcSort" type="number" value="${data.sortOrder||0}"></div>
-                ${envSettingsHtml}
             </div>
+            ${hasCompose ? `<div class="editor-tab-panel" data-edpanel="compose">
+                <div id="composeEditorContent" style="max-height:70vh;overflow-y:auto">
+                    <div style="padding:1rem;text-align:center;color:var(--text-m)"><span class="spinner"></span> ${t('editor.composeLoading')}</div>
+                </div>
+            </div>` : ''}
             <div class="modal-actions" style="margin-top:1rem">
                 ${isEdit && !containers.find(c => c.name === data.containerName)?.protected ? `<button class="svc-delete-btn" id="svcDeleteBtn">${t('confirm.delete')}</button>` : '<span></span>'}
                 <div style="display:flex;gap:.5rem">
@@ -110,11 +123,31 @@ async function openServiceEditor(id) {
             </div>
         </div>`;
     document.body.appendChild(overlay);
-        requestAnimationFrame(() => overlay.classList.add('active'));
+    requestAnimationFrame(() => overlay.classList.add('active'));
 
-        const close = () => { overlay.classList.remove('active'); setTimeout(() => overlay.remove(), 300); };
+    const close = () => { overlay.classList.remove('active'); setTimeout(() => overlay.remove(), 300); };
     overlay.querySelector('.modal-cancel').addEventListener('click', close);
     overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+    // Editor tab switching — hide settings action buttons on compose tab
+    const settingsActions = overlay.querySelector('.modal-actions');
+    if (hasCompose) {
+        let composeLoaded = false;
+        overlay.querySelectorAll('.editor-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                overlay.querySelectorAll('.editor-tab').forEach(t => t.classList.remove('active'));
+                overlay.querySelectorAll('.editor-tab-panel').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                overlay.querySelector(`[data-edpanel="${tab.dataset.edtab}"]`).classList.add('active');
+                // Hide settings action buttons when on compose tab
+                if (settingsActions) settingsActions.style.display = tab.dataset.edtab === 'compose' ? 'none' : '';
+                if (tab.dataset.edtab === 'compose' && !composeLoaded) {
+                    composeLoaded = true;
+                    loadComposeEditor(overlay, id, data);
+                }
+            });
+        });
+    }
 
     const deleteBtn = overlay.querySelector('#svcDeleteBtn');
     if (deleteBtn) {
@@ -240,7 +273,119 @@ async function openServiceEditor(id) {
     });
 }
 
+async function loadComposeEditor(overlay, serviceId, svc) {
+    const content = overlay.querySelector('#composeEditorContent');
+    try {
+        const res = await fetch(`/api/Services/${serviceId}/compose`);
+        if (!res.ok) {
+            content.innerHTML = `<div style="padding:1rem;color:var(--text-m)">${t('editor.composeNotFound')}</div>`;
+            return;
+        }
+        const data = await res.json();
+        content.dataset.serviceId = serviceId;
+        content.innerHTML = `
+            <textarea id="composeYamlEditor" class="compose-editor-textarea" rows="18" spellcheck="false">${escHtml(data.yaml)}</textarea>
+            <div style="display:flex;gap:.5rem;margin-top:.6rem;align-items:center">
+                <button class="section-btn primary" id="composeSaveBtn" onclick="saveCompose(${serviceId})">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                    ${t('editor.saveRecreate')}
+                </button>
+                <button class="section-btn" onclick="loadComposeEditor(this.closest('.modal-overlay'),${serviceId},null)" title="${t('editor.reset')}">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+                </button>
+            </div>
+            <div class="compose-ai-chat" style="margin-top:.8rem;border-top:1px solid var(--border);padding-top:.6rem">
+                <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-m);margin-bottom:.4rem;display:flex;align-items:center;gap:.3rem">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                    ${t('editor.aiAssist')}
+                </div>
+                <div id="composeAiMessages" class="compose-ai-messages"></div>
+                <div style="display:flex;gap:.4rem;align-items:center">
+                    <input type="text" id="composeAiInput" class="compose-ai-input" placeholder="${t('editor.aiChatPlaceholder')}"
+                        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendComposeAiChat(${serviceId});}">
+                    <button class="section-btn primary section-btn-sm" onclick="sendComposeAiChat(${serviceId})">${t('editor.aiChatSend')}</button>
+                </div>
+            </div>`;
+    } catch {
+        content.innerHTML = `<div style="padding:1rem;color:var(--red)">${t('editor.composeNotFound')}</div>`;
+    }
+}
+
+async function saveCompose(serviceId) {
+    const textarea = document.querySelector('#composeYamlEditor');
+    const btn = document.querySelector('#composeSaveBtn');
+    if (!textarea || !btn) return;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner"></span> ${t('msg.saving')}`;
+    try {
+        const res = await fetch(`/api/Services/${serviceId}/compose`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ yaml: textarea.value })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            showToast(t('editor.composeSaveOk'), data.recreated ? 'success' : 'warning');
+            fetchAll();
+        } else {
+            showToast(t('editor.composeSaveFail'), 'error');
+        }
+    } catch {
+        showToast(t('editor.composeSaveFail'), 'error');
+    }
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> ${t('editor.saveRecreate')}`;
+}
+
+async function sendComposeAiChat(serviceId) {
+    const input = document.querySelector('#composeAiInput');
+    const messages = document.querySelector('#composeAiMessages');
+    const textarea = document.querySelector('#composeYamlEditor');
+    if (!input || !messages || !textarea) return;
+    const instruction = input.value.trim();
+    if (!instruction) return;
+
+    // Show user message
+    messages.innerHTML += `<div class="compose-ai-msg user"><span class="compose-ai-msg-text">${escHtml(instruction)}</span></div>`;
+    input.value = '';
+    input.disabled = true;
+
+    // Show loading
+    messages.innerHTML += `<div class="compose-ai-msg ai" id="aiMsgLoading"><span class="spinner" style="width:12px;height:12px"></span> ${t('editor.aiAssistLoading')}</div>`;
+    messages.scrollTop = messages.scrollHeight;
+
+    try {
+        const res = await fetch(`/api/Services/${serviceId}/compose/ai-assist`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ yaml: textarea.value, instruction })
+        });
+        document.querySelector('#aiMsgLoading')?.remove();
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+
+        if (data.modifiedYaml) {
+            // AI returned modified YAML — show diff and apply button
+            textarea.value = data.modifiedYaml;
+            textarea.classList.add('changed');
+            messages.innerHTML += `<div class="compose-ai-msg ai">
+                <span class="compose-ai-msg-text">${escHtml(data.explanation || t('editor.yamlUpdated'))}</span>
+                <div style="margin-top:.3rem;font-size:.7rem;color:var(--green)">✓ ${t('editor.aiApply')} — ${t('editor.yamlApplied')}</div>
+            </div>`;
+        } else if (data.suggestions) {
+            messages.innerHTML += `<div class="compose-ai-msg ai"><span class="compose-ai-msg-text" style="white-space:pre-wrap">${escHtml(data.suggestions)}</span></div>`;
+        }
+    } catch {
+        document.querySelector('#aiMsgLoading')?.remove();
+        messages.innerHTML += `<div class="compose-ai-msg ai" style="color:var(--red)">${t('ai.error')}</div>`;
+    }
+    input.disabled = false;
+    input.focus();
+    messages.scrollTop = messages.scrollHeight;
+}
+
 async function deleteService(id, name) {
+    if (deletingServiceIds.has(id)) return;
     const ok = await showConfirm(
         t('confirm.deleteTitle'),
         `<strong>${escHtml(name)}</strong><br><br>${t('confirm.deleteDetail')}`,
@@ -249,25 +394,44 @@ async function deleteService(id, name) {
     );
     if (!ok) return;
 
-    showToast(`${name} ${t('msg.deleting')}`, 'info', 10000);
+    deletingServiceIds.add(id);
+
+    // Show progress toast
+    const progressToast = document.createElement('div');
+    progressToast.className = 'toast info';
+    progressToast.innerHTML = `<span class="toast-icon"><span class="spinner" style="width:18px;height:18px;border-width:2px"></span></span><span class="toast-msg" id="deleteProgress">${name}: ${t('msg.deleting')}</span>`;
+    $('#toastContainer').appendChild(progressToast);
+    const setProgress = (msg) => { const el = progressToast.querySelector('#deleteProgress'); if (el) el.textContent = `${name}: ${msg}`; };
 
     try {
+        setProgress(t('msg.deleteStep.removing'));
         const res = await fetch(`/api/Services/${id}`, { method: 'DELETE' });
         const data = await res.json();
+
         if (data.ok) {
+            setProgress(t('msg.deleteStep.done'));
+            services = services.filter(s => s.id !== id);
+            renderServices();
+
+            // Remove progress, show success
+            setTimeout(() => { progressToast.classList.add('removing'); setTimeout(() => progressToast.remove(), 300); }, 500);
             showToast(`${name} ${t('msg.svcDeleted')}`, 'success');
+
             if (data.warnings?.length) {
                 data.warnings.forEach(w => showToast(w, 'warning', 5000));
             }
-            // Optimistic: remove from local state immediately
-            services = services.filter(s => s.id !== id);
-            renderServices();
         } else {
+            progressToast.classList.add('removing');
+            setTimeout(() => progressToast.remove(), 300);
             showToast(`${t('msg.svcDeleteFail')}: ${data.error || ''}`, 'error');
         }
-        fetchAll();
-        loadEnvData();
     } catch (err) {
+        progressToast.classList.add('removing');
+        setTimeout(() => progressToast.remove(), 300);
         showToast(`${t('msg.svcDeleteFail')}: ${err.message}`, 'error');
     }
+
+    await fetchAll();
+    loadEnvData();
+    deletingServiceIds.delete(id);
 }

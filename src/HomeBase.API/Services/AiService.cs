@@ -33,7 +33,7 @@ public class AiService
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
     }
 
-    public async Task<(bool enabled, string? apiKey, string model)> GetConfigAsync()
+    public async Task<AiConfig> GetConfigAsync()
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -43,10 +43,24 @@ public class AiService
             .ToListAsync();
 
         var enabled = aiSettings.FirstOrDefault(s => s.Key == "AI_ENABLED")?.Value?.Equals("true", StringComparison.OrdinalIgnoreCase) ?? false;
-        var apiKey = aiSettings.FirstOrDefault(s => s.Key == "OPENAI_API_KEY")?.Value;
+        var apiKey = aiSettings.FirstOrDefault(s => s.Key == "AI_API_KEY")?.Value
+                  ?? aiSettings.FirstOrDefault(s => s.Key == "OPENAI_API_KEY")?.Value;
         var model = aiSettings.FirstOrDefault(s => s.Key == "AI_MODEL")?.Value ?? "gpt-4.1-mini";
+        var provider = aiSettings.FirstOrDefault(s => s.Key == "AI_PROVIDER")?.Value ?? "openai";
+        var baseUrl = aiSettings.FirstOrDefault(s => s.Key == "AI_BASE_URL")?.Value ?? "";
 
-        return (enabled, apiKey, model);
+        return new AiConfig(enabled, apiKey, model, provider, baseUrl);
+    }
+
+    private string GetEndpointUrl(string provider, string baseUrl)
+    {
+        return provider.ToLowerInvariant() switch
+        {
+            "gemini" => "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+            "claude" => "https://api.anthropic.com/v1/messages",
+            "custom" => baseUrl,
+            _ => "https://api.openai.com/v1/chat/completions" // openai default
+        };
     }
 
     // Files to always read if found (relative to project root)
@@ -182,11 +196,11 @@ public class AiService
 
     public async Task<AiAnalysisResult> AnalyzeProjectAsync(string projectPath)
     {
-        var (enabled, apiKey, model) = await GetConfigAsync();
-        if (!enabled)
+        var config = await GetConfigAsync();
+        if (!config.Enabled)
             throw new InvalidOperationException("AI feature is disabled");
-        if (string.IsNullOrWhiteSpace(apiKey))
-            throw new InvalidOperationException("OpenAI API key not configured");
+        if (string.IsNullOrWhiteSpace(config.ApiKey))
+            throw new InvalidOperationException("AI API key not configured");
 
         var scan = ScanProject(projectPath);
         var projectName = Path.GetFileName(projectPath);
@@ -300,55 +314,8 @@ Return ONLY valid JSON (no markdown, no text before/after):
         userPrompt.AppendLine();
         userPrompt.AppendLine("Analyze the above files carefully and return the JSON configuration. The service MUST start successfully on first try.");
 
-
-        var requestBody = new
-        {
-            model = model,
-            messages = new[]
-            {
-                new { role = "system", content = systemPrompt },
-                new { role = "user", content = userPrompt.ToString() }
-            },
-            temperature = 0.3,
-            max_tokens = 2000
-        };
-
-        var json = JsonSerializer.Serialize(requestBody);
-        var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions")
-        {
-            Content = new StringContent(json, Encoding.UTF8, "application/json")
-        };
-        request.Headers.Add("Authorization", $"Bearer {apiKey}");
-
-        var response = await _http.SendAsync(request);
-        var responseBody = await response.Content.ReadAsStringAsync();
-
-        if (!response.IsSuccessStatusCode)
-        {
-            _logger.LogError("OpenAI API error: {Status} - {Body}", response.StatusCode, responseBody);
-            throw new InvalidOperationException($"OpenAI API error: {response.StatusCode}");
-        }
-
-        // Parse response
-        using var doc = JsonDocument.Parse(responseBody);
-        var content = doc.RootElement
-            .GetProperty("choices")[0]
-            .GetProperty("message")
-            .GetProperty("content")
-            .GetString();
-
-        if (string.IsNullOrWhiteSpace(content))
-            throw new InvalidOperationException("Empty response from AI");
-
-        // Extract JSON from response (may be wrapped in markdown code block)
-        var jsonContent = content.Trim();
-        if (jsonContent.StartsWith("```"))
-        {
-            var startIdx = jsonContent.IndexOf('{');
-            var endIdx = jsonContent.LastIndexOf('}');
-            if (startIdx >= 0 && endIdx > startIdx)
-                jsonContent = jsonContent[startIdx..(endIdx + 1)];
-        }
+        var content = await CallAiAsync(config, systemPrompt, userPrompt.ToString(), 0.3, 2000);
+        var jsonContent = ExtractJson(content);
 
         // Parse AI response
         using var aiDoc = JsonDocument.Parse(jsonContent);
@@ -410,6 +377,282 @@ Return ONLY valid JSON (no markdown, no text before/after):
         );
     }
 
+    public async Task<object> ModifyComposeAsync(string composeYaml, string instruction, string? imageName)
+    {
+        var config = await GetConfigAsync();
+        if (!config.Enabled) throw new InvalidOperationException("AI feature is disabled");
+        if (string.IsNullOrWhiteSpace(config.ApiKey)) throw new InvalidOperationException("AI API key not configured");
+
+        var systemPrompt = @"You are a Docker Compose expert assistant for the HomeBase dashboard.
+The user will give you a docker-compose.yml and an instruction to modify it.
+You MUST return ONLY valid JSON in this exact format:
+{""modifiedYaml"": ""the complete modified YAML"", ""explanation"": ""brief description of what changed""}
+Rules:
+- Apply the user's instruction to the YAML
+- Keep the YAML valid and properly formatted
+- Preserve all existing configuration unless the instruction says otherwise
+- The modifiedYaml must be the COMPLETE file, not a diff
+- Be compatible with HomeBase: keep networks, container_name, restart policy
+- Return ONLY the JSON, no markdown, no text before/after";
+
+        var userPrompt = $"Current docker-compose.yml:\n```yaml\n{composeYaml}\n```\n{(imageName != null ? $"\nImage: {imageName}" : "")}\n\nInstruction: {instruction}";
+
+        try
+        {
+            var content = await CallAiAsync(config, systemPrompt, userPrompt, 0.2, 2000);
+            var jsonContent = ExtractJson(content);
+            using var aiDoc = JsonDocument.Parse(jsonContent);
+            var root = aiDoc.RootElement;
+            var modifiedYaml = root.TryGetProperty("modifiedYaml", out var yamlEl) ? yamlEl.GetString() : null;
+            var explanation = root.TryGetProperty("explanation", out var expEl) ? expEl.GetString() : "";
+            return new { modifiedYaml, explanation };
+        }
+        catch
+        {
+            return new { suggestions = "AI failed to modify compose" };
+        }
+    }
+
+    /// Unified AI call helper — handles Claude vs OpenAI-compatible providers
+    private async Task<string> CallAiAsync(AiConfig config, string systemPrompt, string userPrompt, double temperature = 0.2, int maxTokens = 3000)
+    {
+        var endpointUrl = GetEndpointUrl(config.Provider, config.BaseUrl);
+        string content;
+
+        if (config.Provider.Equals("claude", StringComparison.OrdinalIgnoreCase))
+        {
+            var requestBody = new { model = config.Model, system = systemPrompt,
+                messages = new[] { new { role = "user", content = userPrompt } }, temperature, max_tokens = maxTokens };
+            var json = JsonSerializer.Serialize(requestBody);
+            var request = new HttpRequestMessage(HttpMethod.Post, endpointUrl)
+            { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+            request.Headers.Add("x-api-key", config.ApiKey);
+            request.Headers.Add("anthropic-version", "2023-06-01");
+            var response = await _http.SendAsync(request);
+            var body = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("AI API error: {Status} - {Body}", response.StatusCode, body);
+                throw new InvalidOperationException($"AI API error: {response.StatusCode}");
+            }
+            using var doc = JsonDocument.Parse(body);
+            content = doc.RootElement.GetProperty("content")[0].GetProperty("text").GetString() ?? "";
+        }
+        else
+        {
+            var requestBody = new { model = config.Model,
+                messages = new[] { new { role = "system", content = systemPrompt }, new { role = "user", content = userPrompt } },
+                temperature, max_tokens = maxTokens };
+            var json = JsonSerializer.Serialize(requestBody);
+            var request = new HttpRequestMessage(HttpMethod.Post, endpointUrl)
+            { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+            request.Headers.Add("Authorization", $"Bearer {config.ApiKey}");
+            var response = await _http.SendAsync(request);
+            var body = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("AI API error: {Status} - {Body}", response.StatusCode, body);
+                throw new InvalidOperationException($"AI API error: {response.StatusCode}");
+            }
+            using var doc = JsonDocument.Parse(body);
+            content = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
+        }
+
+        if (string.IsNullOrWhiteSpace(content))
+            throw new InvalidOperationException("Empty response from AI");
+
+        return content;
+    }
+
+    /// Extract JSON from AI response (may be wrapped in markdown code block)
+    private static string ExtractJson(string content)
+    {
+        var jsonContent = content.Trim();
+        if (jsonContent.StartsWith("```"))
+        {
+            var s = jsonContent.IndexOf('{');
+            var e = jsonContent.LastIndexOf('}');
+            if (s >= 0 && e > s) jsonContent = jsonContent[s..(e + 1)];
+        }
+        return jsonContent;
+    }
+
+    /// Agent-based deploy fix with chain-of-thought reasoning
+    public async Task<AgentFixResponse> AgentFixAsync(DeployContext ctx, List<PreviousAttempt>? previousAttempts, string? userInstruction, string? language = null)
+    {
+        var config = await GetConfigAsync();
+        if (!config.Enabled || string.IsNullOrWhiteSpace(config.ApiKey))
+            return new AgentFixResponse("AI is not configured", null, null);
+
+        var previousSection = "";
+        if (previousAttempts != null && previousAttempts.Count > 0)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("\nThese fixes were already tried and FAILED — do NOT repeat them:");
+            for (int i = 0; i < previousAttempts.Count; i++)
+            {
+                sb.AppendLine($"  Attempt {i + 1}: {previousAttempts[i].FixDescription}");
+                if (!string.IsNullOrWhiteSpace(previousAttempts[i].ResultLogs))
+                    sb.AppendLine($"    Result: {previousAttempts[i].ResultLogs}");
+            }
+            previousSection = sb.ToString();
+        }
+
+        var userInstrSection = !string.IsNullOrWhiteSpace(userInstruction)
+            ? $"\nUser instruction: {userInstruction}" : "";
+
+        var langInstruction = language?.ToLowerInvariant() == "tr"
+            ? "\nIMPORTANT: You MUST respond in Turkish. All reasoning, descriptions, and userActionRequired text must be in Turkish."
+            : "";
+
+        var systemPrompt = $@"You are a Docker deployment troubleshooter. Analyze the failing container step by step.{langInstruction}
+
+STEP 1 - ERROR: Read the container logs. What is the EXACT error? Quote it.
+STEP 2 - COMPONENT: What module/package/service is failing?
+STEP 3 - DEPENDENCIES: Check requirements.txt/package.json/go.mod. What packages are installed?
+STEP 4 - ENVIRONMENT: Check docker-compose.yml environment variables. Are connection strings correct for the installed packages? (e.g., asyncpg needs postgresql+asyncpg://, not postgresql://)
+STEP 5 - DOCKERFILE: Is the Dockerfile correct? WORKDIR, COPY, CMD?
+STEP 6 - NETWORK: Check running containers and network. Can this container reach its dependencies?
+STEP 7 - ROOT CAUSE: Based on steps 1-6, what is the root cause?
+STEP 8 - FIX: What is the MINIMAL fix? Only modify compose, Dockerfile, or run infra commands. Do NOT modify project source files.
+
+COMPOSE SAFETY: Copy the ENTIRE original, change ONLY the broken line. NEVER change paths, NEVER add services, NEVER remove name: key.
+
+INFRA ACTIONS:
+- Database creation: ""docker exec homebase-db psql -U homebase -c \""CREATE DATABASE ...;\""""
+- The HomeBase system has a PostgreSQL container named 'homebase-db' with user 'homebase'.
+{previousSection}{userInstrSection}
+
+Return ONLY valid JSON (no markdown, no text before/after):
+{{
+  ""reasoning"": ""Step 1: [quote exact error] Step 2: ... Step 7: ROOT CAUSE: ..."",
+  ""fix"": {{""type"": ""compose|dockerfile|infra"", ""content"": ""the COMPLETE fixed file or shell command"", ""description"": ""short description of what was changed""}},
+  ""userActionRequired"": null
+}}
+If the issue requires project source file changes that cannot be worked around via compose/Dockerfile/infra, return:
+{{
+  ""reasoning"": ""Step 1: ... Step 7: ROOT CAUSE: ..."",
+  ""fix"": null,
+  ""userActionRequired"": ""You need to change X in Y because Z""
+}}";
+
+        // Build user prompt with all context
+        var userPrompt = new StringBuilder();
+        userPrompt.AppendLine($"Container: {ctx.ContainerName}");
+        userPrompt.AppendLine($"\n=== docker-compose.yml ===\n{ctx.ComposeYaml}");
+        if (!string.IsNullOrWhiteSpace(ctx.DockerfileContent))
+            userPrompt.AppendLine($"\n=== Dockerfile ===\n{ctx.DockerfileContent}");
+        userPrompt.AppendLine($"\n=== Container Logs (last 100 lines) ===\n{ctx.ContainerLogs}");
+        if (!string.IsNullOrWhiteSpace(ctx.ContainerState))
+            userPrompt.AppendLine($"\n=== Container State ===\n{ctx.ContainerState}");
+        if (!string.IsNullOrWhiteSpace(ctx.ProjectFiles))
+            userPrompt.AppendLine($"\n=== Project Files ===\n{ctx.ProjectFiles}");
+        if (!string.IsNullOrWhiteSpace(ctx.DirectoryListing))
+            userPrompt.AppendLine($"\n=== Directory Listing ===\n{ctx.DirectoryListing}");
+        if (!string.IsNullOrWhiteSpace(ctx.NetworkInfo))
+            userPrompt.AppendLine($"\n=== Docker Network ===\n{ctx.NetworkInfo}");
+        if (!string.IsNullOrWhiteSpace(ctx.RunningContainers))
+            userPrompt.AppendLine($"\n=== Running Containers ===\n{ctx.RunningContainers}");
+
+        try
+        {
+            var raw = await CallAiAsync(config, systemPrompt, userPrompt.ToString(), 0.1, 4000);
+            var jsonContent = ExtractJson(raw);
+
+            using var aiDoc = JsonDocument.Parse(jsonContent);
+            var root = aiDoc.RootElement;
+
+            var reasoning = root.TryGetProperty("reasoning", out var rEl) ? rEl.GetString() ?? "" : "";
+            var userAction = root.TryGetProperty("userActionRequired", out var uaEl) && uaEl.ValueKind != JsonValueKind.Null
+                ? uaEl.GetString() : null;
+
+            AgentFix? fix = null;
+            if (root.TryGetProperty("fix", out var fixEl) && fixEl.ValueKind != JsonValueKind.Null)
+            {
+                var type = fixEl.TryGetProperty("type", out var tEl) ? tEl.GetString() ?? "" : "";
+                var content2 = fixEl.TryGetProperty("content", out var cEl) ? cEl.GetString() ?? "" : "";
+                var desc = fixEl.TryGetProperty("description", out var dEl) ? dEl.GetString() ?? "" : "";
+                if (!string.IsNullOrWhiteSpace(type) && !string.IsNullOrWhiteSpace(content2))
+                    fix = new AgentFix(type, content2, desc);
+            }
+
+            return new AgentFixResponse(reasoning, fix, userAction);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Agent fix failed for {Container}", ctx.ContainerName);
+            return new AgentFixResponse($"AI analysis failed: {ex.Message}", null, null);
+        }
+    }
+
+    public async Task<string> AssistComposeAsync(string composeYaml, string? imageName)
+    {
+        var config = await GetConfigAsync();
+        if (!config.Enabled) throw new InvalidOperationException("AI feature is disabled");
+        if (string.IsNullOrWhiteSpace(config.ApiKey)) throw new InvalidOperationException("AI API key not configured");
+
+        var systemPrompt = "You are a Docker Compose expert. Analyze the given docker-compose.yml content and provide improvement suggestions, best practices, and potential issues. Be concise and practical. Return plain text suggestions.";
+        var userPrompt = $"Docker Compose YAML:\n```yaml\n{composeYaml}\n```\n{(imageName != null ? $"\nImage: {imageName}" : "")}\n\nProvide suggestions for improvements, security, and best practices.";
+
+        return await CallAiAsync(config, systemPrompt, userPrompt, 0.3, 1500);
+    }
+
+    /// Detect the main user-facing URL path by analyzing project source code
+    public async Task<string?> DetectUrlPathAsync(DeployContext ctx)
+    {
+        var config = await GetConfigAsync();
+        if (!config.Enabled || string.IsNullOrWhiteSpace(config.ApiKey))
+            return null;
+
+        var systemPrompt = @"You are analyzing a web application's source code to find its main user-facing URL path.
+The root path '/' returns 404. You need to find where the app serves its main UI or landing page.
+
+Look for:
+- FastAPI/Starlette: app.mount(), @app.get() decorators, static files mount paths
+- Express/Node: app.use(), router paths, static middleware
+- Django: urlpatterns, ROOT_URLCONF
+- ASP.NET: MapFallbackToFile, UseStaticFiles, controller routes
+- Spring: @RequestMapping, @GetMapping
+- Any framework: static file serving paths, index.html locations, admin panels
+
+Return ONLY a JSON object:
+{""urlPath"": ""/the-path""}
+
+If the app has no UI (pure API), return:
+{""urlPath"": ""/docs""}
+
+If you cannot determine the path, return:
+{""urlPath"": null}
+
+Return ONLY the JSON, nothing else.";
+
+        var userPrompt = new StringBuilder();
+        userPrompt.AppendLine($"Container: {ctx.ContainerName}");
+        if (!string.IsNullOrWhiteSpace(ctx.ProjectFiles))
+            userPrompt.AppendLine($"\n=== Project Files ===\n{ctx.ProjectFiles}");
+        if (!string.IsNullOrWhiteSpace(ctx.DockerfileContent))
+            userPrompt.AppendLine($"\n=== Dockerfile ===\n{ctx.DockerfileContent}");
+        if (!string.IsNullOrWhiteSpace(ctx.DirectoryListing))
+            userPrompt.AppendLine($"\n=== Directory Listing ===\n{ctx.DirectoryListing}");
+        userPrompt.AppendLine($"\n=== docker-compose.yml ===\n{ctx.ComposeYaml}");
+
+        try
+        {
+            var raw = await CallAiAsync(config, systemPrompt, userPrompt.ToString(), 0.1, 200);
+            var json = ExtractJson(raw);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("urlPath", out var pathEl) && pathEl.ValueKind == JsonValueKind.String)
+                return pathEl.GetString();
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to detect URL path for {Container}", ctx.ContainerName);
+            return null;
+        }
+    }
+
     private string GetExistingComposeServices()
     {
         try
@@ -437,6 +680,20 @@ Return ONLY valid JSON (no markdown, no text before/after):
         catch { return "3000, 5433"; }
     }
 }
+
+public record AiConfig(bool Enabled, string? ApiKey, string Model, string Provider, string BaseUrl);
+
+public record DeployContext(
+    string ContainerName,
+    string ComposeYaml,
+    string? DockerfileContent,
+    string ContainerLogs,
+    string? ContainerState,
+    string? ProjectFiles,
+    string? DirectoryListing,
+    string? NetworkInfo,
+    string? RunningContainers
+);
 
 public class ProjectScanResult
 {

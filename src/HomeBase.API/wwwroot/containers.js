@@ -332,10 +332,10 @@ function renderContainerDetail(name) {
         infoHtml = `
             <div class="ctr-info-grid">
                 <div class="ctr-info-section-title">${t('detail.info')}</div>
-                <div class="ctr-info-item"><span class="ctr-info-label">Image</span><span class="ctr-info-value" title="${escHtml(inspect.image)}">${escHtml(inspect.image)}</span></div>
-                <div class="ctr-info-item"><span class="ctr-info-label">Image ID</span><span class="ctr-info-value">${inspect.imageId}</span></div>
+                <div class="ctr-info-item"><span class="ctr-info-label">${t('detail.image')}</span><span class="ctr-info-value" title="${escHtml(inspect.image)}">${escHtml(inspect.image)}</span></div>
+                <div class="ctr-info-item"><span class="ctr-info-label">${t('detail.imageId')}</span><span class="ctr-info-value">${inspect.imageId}</span></div>
                 <div class="ctr-info-item"><span class="ctr-info-label">${t('detail.created')}</span><span class="ctr-info-value">${created}</span></div>
-                <div class="ctr-info-item"><span class="ctr-info-label">Restart</span><span class="ctr-info-value">${inspect.restartCount} <span class="txt-muted">(policy: ${restartPolicyStr})</span></span></div>
+                <div class="ctr-info-item"><span class="ctr-info-label">${t('detail.restart')}</span><span class="ctr-info-value">${inspect.restartCount} <span class="txt-muted">(${t('detail.policy')}: ${restartPolicyStr})</span></span></div>
                 ${healthBadge}
                 ${networksHtml ? `<div class="ctr-info-section-title" style="margin-top:.5rem">${t('detail.network')}</div>${networksHtml}` : ''}
             </div>`;
@@ -346,7 +346,7 @@ function renderContainerDetail(name) {
     if (inspect?.mounts?.length > 0) {
         mountsHtml = `
             <div class="ctr-mounts">
-                <div class="ctr-mounts-header">Volumes (${inspect.mounts.length})</div>
+                <div class="ctr-mounts-header">${t('detail.volumes')} (${inspect.mounts.length})</div>
                 ${inspect.mounts.map(m => `
                     <div class="ctr-mount">
                         <span class="ctr-mount-type">${m.type}</span>
@@ -361,11 +361,11 @@ function renderContainerDetail(name) {
             <div class="ctr-gauges">
                 <div class="ctr-gauges-title">${t('detail.resources')}</div>
                 <div class="ctr-gauge">
-                    <div class="ctr-gauge-header"><span>CPU</span><span class="ctr-gauge-val"><span data-live="cpu">${cpuVal.toFixed(1)}%</span> ${cpuLimitTag}</span></div>
+                    <div class="ctr-gauge-header"><span>${t('health.cpu')}</span><span class="ctr-gauge-val"><span data-live="cpu">${cpuVal.toFixed(1)}%</span> ${cpuLimitTag}</span></div>
                     <div class="ctr-mini-chart" data-chart-type="cpu">${detailSparkline(h?.cpu, '#6366f1')}</div>
                 </div>
                 <div class="ctr-gauge">
-                    <div class="ctr-gauge-header"><span>Memory</span><span class="ctr-gauge-val"><span data-live="mem">${memMB}MB (${memPct}%)</span> ${memLimitTag}</span></div>
+                    <div class="ctr-gauge-header"><span>${t('health.memory')}</span><span class="ctr-gauge-val"><span data-live="mem">${memMB}MB (${memPct}%)</span> ${memLimitTag}</span></div>
                     <div class="ctr-mini-chart" data-chart-type="mem">${detailSparkline(h?.mem, '#10b981')}</div>
                 </div>
                 ${diskHtml}

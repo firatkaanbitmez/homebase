@@ -9,31 +9,94 @@ async function openIconPicker(inputEl, previewEl) {
             if (res.ok) iconCache = await res.json();
         } catch {}
     }
-    if (!iconCache || !iconCache.length) { showToast('No icons found', 'warning'); return; }
 
     // Close any existing picker
     document.querySelectorAll('.icon-picker-popover').forEach(p => p.remove());
 
     const popover = document.createElement('div');
     popover.className = 'icon-picker-popover';
-    popover.innerHTML = `<div class="icon-picker-grid">${iconCache.map(ic =>
-        `<div class="icon-picker-item" data-icon="${escHtml(ic)}"><img src="${ic}" alt=""></div>`
-    ).join('')}</div>`;
+    popover.style.maxWidth = '320px';
+    popover.innerHTML = `
+        <div class="icon-picker-tabs">
+            <button class="icon-picker-tab active" data-iptab="existing">${t('icon.existing')}</button>
+            <button class="icon-picker-tab" data-iptab="url">${t('icon.url')}</button>
+            <button class="icon-picker-tab" data-iptab="upload">${t('icon.upload')}</button>
+        </div>
+        <div class="icon-picker-panel active" data-ippanel="existing">
+            ${iconCache && iconCache.length ? `<div class="icon-picker-grid">${iconCache.map(ic =>
+                `<div class="icon-picker-item" data-icon="${escHtml(ic)}"><img src="${ic}" alt=""></div>`
+            ).join('')}</div>` : `<div style="padding:1rem;text-align:center;color:var(--text-m);font-size:.8rem">${t('msg.noIcons')}</div>`}
+        </div>
+        <div class="icon-picker-panel" data-ippanel="url">
+            <div style="padding:.5rem;display:flex;flex-direction:column;gap:.5rem">
+                <input type="text" class="ip-url-input" placeholder="${t('icon.urlPlaceholder')}" style="background:var(--bg-3);border:1px solid var(--border);border-radius:6px;padding:.4rem .6rem;font-size:.78rem;color:var(--text);outline:none;width:100%">
+                <div style="display:flex;align-items:center;gap:.5rem">
+                    <img class="ip-url-preview" src="" alt="" style="width:32px;height:32px;object-fit:contain;border-radius:4px;display:none" onerror="this.style.display='none'">
+                    <button class="section-btn primary section-btn-sm ip-url-use" style="margin-left:auto">${t('icon.use')}</button>
+                </div>
+            </div>
+        </div>
+        <div class="icon-picker-panel" data-ippanel="upload">
+            <div class="ip-upload-zone" style="padding:1.5rem;text-align:center;border:2px dashed var(--border);border-radius:var(--rs);margin:.5rem;cursor:pointer;transition:border-color .15s">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-m)" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <div style="font-size:.75rem;color:var(--text-m);margin-top:.3rem">${t('icon.uploadHint')}</div>
+                <input type="file" class="ip-file-input" accept=".png,.svg,.ico,.jpg,.webp" style="display:none">
+            </div>
+        </div>`;
 
-    // Position near button
     const rect = inputEl.getBoundingClientRect();
     popover.style.position = 'fixed';
     popover.style.top = (rect.bottom + 4) + 'px';
-    popover.style.left = rect.left + 'px';
+    popover.style.left = Math.min(rect.left, window.innerWidth - 340) + 'px';
     document.body.appendChild(popover);
 
-    popover.querySelectorAll('.icon-picker-item').forEach(item => {
-        item.addEventListener('click', () => {
-            const icon = item.dataset.icon;
-            inputEl.value = icon;
-            if (previewEl) { previewEl.src = icon; previewEl.style.display = 'inline'; }
-            popover.remove();
+    const selectIcon = (icon) => {
+        inputEl.value = icon;
+        if (previewEl) { previewEl.src = icon; previewEl.style.display = 'inline'; }
+        popover.remove();
+    };
+
+    // Tab switching
+    popover.querySelectorAll('.icon-picker-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            popover.querySelectorAll('.icon-picker-tab').forEach(t => t.classList.remove('active'));
+            popover.querySelectorAll('.icon-picker-panel').forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            popover.querySelector(`[data-ippanel="${tab.dataset.iptab}"]`).classList.add('active');
         });
+    });
+
+    // Existing icons
+    popover.querySelectorAll('.icon-picker-item').forEach(item => {
+        item.addEventListener('click', () => selectIcon(item.dataset.icon));
+    });
+
+    // URL input
+    const urlInput = popover.querySelector('.ip-url-input');
+    const urlPreview = popover.querySelector('.ip-url-preview');
+    urlInput.addEventListener('input', () => {
+        const url = urlInput.value.trim();
+        if (url) { urlPreview.src = url; urlPreview.style.display = 'block'; }
+        else urlPreview.style.display = 'none';
+    });
+    popover.querySelector('.ip-url-use').addEventListener('click', () => {
+        const url = urlInput.value.trim();
+        if (url) selectIcon(url);
+    });
+
+    // Upload
+    const uploadZone = popover.querySelector('.ip-upload-zone');
+    const fileInput = popover.querySelector('.ip-file-input');
+    uploadZone.addEventListener('click', () => fileInput.click());
+    uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.style.borderColor = 'var(--accent)'; });
+    uploadZone.addEventListener('dragleave', () => { uploadZone.style.borderColor = 'var(--border)'; });
+    uploadZone.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadZone.style.borderColor = 'var(--border)';
+        if (e.dataTransfer.files.length) uploadIconFile(e.dataTransfer.files[0], selectIcon, uploadZone);
+    });
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length) uploadIconFile(fileInput.files[0], selectIcon, uploadZone);
     });
 
     // Close on click outside
@@ -43,6 +106,23 @@ async function openIconPicker(inputEl, previewEl) {
         };
         document.addEventListener('click', closeHandler);
     }, 10);
+}
+
+async function uploadIconFile(file, onSuccess, zone) {
+    if (file.size > 512 * 1024) { showToast(t('msg.maxFileSize'), 'warning'); return; }
+    zone.innerHTML = `<span class="spinner"></span> ${t('icon.uploading')}`;
+    try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch('/api/System/icons/upload', { method: 'POST', body: fd });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        iconCache = null; // invalidate cache
+        onSuccess(data.url);
+    } catch {
+        showToast(t('icon.uploadFail'), 'error');
+        zone.innerHTML = `<div style="font-size:.75rem;color:var(--red)">${t('icon.uploadFail')}</div>`;
+    }
 }
 
 // Container detail tracking

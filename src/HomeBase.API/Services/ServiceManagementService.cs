@@ -102,15 +102,20 @@ public class ServiceManagementService
             return new DeleteResult(false, "Protected service cannot be deleted");
 
         var warnings = new List<string>();
+
+        // Capture all info before deletion
+        var containerName = svc.ContainerName;
         var composeName = svc.ComposeName ?? svc.ContainerName;
         var sectionName = svc.Name;
+        var serviceSlug = svc.ServiceSlug;
+        var serviceName = svc.Name;
 
         // 0. Collect port settings before deletion
         var portValues = new List<int>();
         try
         {
             var portSettings = await db.Settings
-                .Where(s => s.ServiceId == svc.Id || s.Section == sectionName)
+                .Where(s => s.ServiceId == id || s.Section == sectionName)
                 .Where(s => s.IsPortVariable)
                 .ToListAsync();
             foreach (var ps in portSettings)
@@ -121,28 +126,43 @@ public class ServiceManagementService
         }
         catch { }
 
-        // 1. Container stop + remove
-        try { await _docker.RemoveContainerAsync(svc.ContainerName); }
+        // 1. DB record removal FIRST — cascade-deletes related settings
+        try
+        {
+            db.Services.Remove(svc);
+            db.AuditLogs.Add(new AuditLog
+            {
+                Action = "service_delete",
+                Target = containerName,
+                Details = $"Full delete: {serviceName} (slug: {serviceSlug})"
+            });
+            await db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to delete service {Id} from database", id);
+            return new DeleteResult(false, $"Database error: {ex.Message}");
+        }
+
+        // 2. Container stop + remove
+        try { await _docker.RemoveContainerAsync(containerName); }
         catch (Exception ex) { warnings.Add($"Container: {ex.Message}"); }
 
-        // 2. Delete per-service directory if it exists
-        if (!string.IsNullOrEmpty(svc.ServiceSlug))
+        // 3. Delete per-service directory if it exists
+        if (!string.IsNullOrEmpty(serviceSlug))
         {
-            try { await _composeFile.DeleteServiceDirectoryAsync(svc.ServiceSlug); }
+            try { await _composeFile.DeleteServiceDirectoryAsync(serviceSlug); }
             catch (Exception ex) { warnings.Add($"ServiceDir: {ex.Message}"); }
         }
 
-
-        // 3. Settings + env file cleanup
+        // 4. Orphaned settings cleanup (non-cascade, by name)
         try
         {
-            if (svc.Id > 0)
-                await _settingsService.DeleteSettingsForServiceAsync(svc.Id);
             await _settingsService.DeleteSettingsForServiceAsync(composeName, sectionName);
         }
         catch (Exception ex) { warnings.Add($"Settings: {ex.Message}"); }
 
-        // 4. Port access cleanup
+        // 5. Port access cleanup
         try
         {
             foreach (var port in portValues)
@@ -150,26 +170,8 @@ public class ServiceManagementService
         }
         catch (Exception ex) { warnings.Add($"Port access: {ex.Message}"); }
 
-        // 5. DB record removal
-        try
-        {
-            var svcToDelete = await db.Services.FindAsync(id);
-            if (svcToDelete != null)
-            {
-                db.Services.Remove(svcToDelete);
-                db.AuditLogs.Add(new AuditLog
-                {
-                    Action = "service_delete",
-                    Target = svc.ContainerName,
-                    Details = $"Full delete: {svc.Name} (slug: {svc.ServiceSlug})"
-                });
-                await db.SaveChangesAsync();
-            }
-        }
-        catch (Exception ex) { warnings.Add($"DB: {ex.Message}"); }
-
         _logger.LogInformation("Deleted service {Name} ({Slug}) with {Warnings} warnings",
-            svc.Name, svc.ServiceSlug, warnings.Count);
+            serviceName, serviceSlug, warnings.Count);
 
         return new DeleteResult(true, null, warnings);
     }

@@ -1,5 +1,240 @@
 // ─── Wizard Module ───
 
+// ─── Deploy Panel State (Card-based) ───
+let activeDeploy = null;
+
+function openDeployPanel(slug, name) {
+    if (activeDeploy) {
+        if (activeDeploy.timerInterval) clearInterval(activeDeploy.timerInterval);
+        activeDeploy.monitorAbort = true;
+    }
+
+    activeDeploy = {
+        slug, name,
+        startTime: Date.now(),
+        timerInterval: null,
+        done: false,
+        monitorAbort: false,
+        attempts: [
+            { id: 1, status: 'deploying', startTime: Date.now(), endTime: null, reasoning: null, fixDescription: null, userAction: null, logs: null, collapsed: false }
+        ],
+        previousAttempts: [],
+        maxAttempts: 3
+    };
+
+    const panel = document.getElementById('deployPanel');
+    const title = document.getElementById('deployPanelTitle');
+    if (title) title.textContent = `${t('deploy.panelTitle')} — ${name}`;
+    panel.classList.add('open');
+
+    activeDeploy.timerInterval = setInterval(() => {
+        if (!activeDeploy || activeDeploy.done) return;
+        const elapsed = Math.floor((Date.now() - activeDeploy.startTime) / 1000);
+        const mins = Math.floor(elapsed / 60);
+        const secs = elapsed % 60;
+        const timerEl = document.getElementById('deployTimer');
+        if (timerEl) timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')} ${t('deploy.elapsed')}`;
+    }, 1000);
+
+    renderDeployPanel();
+}
+
+function closeDeployPanel() {
+    const panel = document.getElementById('deployPanel');
+    panel.classList.remove('open');
+    if (activeDeploy) {
+        if (activeDeploy.timerInterval) clearInterval(activeDeploy.timerInterval);
+        activeDeploy.monitorAbort = true;
+    }
+    activeDeploy = null;
+}
+
+function stopDeployTimer() {
+    if (!activeDeploy) return;
+    if (activeDeploy.timerInterval) {
+        clearInterval(activeDeploy.timerInterval);
+        activeDeploy.timerInterval = null;
+    }
+    activeDeploy.done = true;
+}
+
+function currentAttempt() {
+    if (!activeDeploy || !activeDeploy.attempts.length) return null;
+    return activeDeploy.attempts[activeDeploy.attempts.length - 1];
+}
+
+function renderDeployPanel() {
+    if (!activeDeploy) return;
+    const body = document.getElementById('deployPanelBody');
+    if (!body) return;
+
+    const attemptsHtml = activeDeploy.attempts.map((att, idx) => {
+        const isLast = idx === activeDeploy.attempts.length - 1;
+        const collapsed = att.collapsed && !isLast;
+        const elapsed = att.startTime ? Math.floor(((att.endTime || (att.status === 'deploying' ? Date.now() : att.startTime)) - att.startTime) / 1000) : 0;
+        const timeStr = elapsed > 0 ? `${elapsed}s` : '';
+
+        const statusIcon = att.status === 'deploying' ? '<span class="spinner" style="width:10px;height:10px;display:inline-block;vertical-align:middle"></span>'
+            : att.status === 'success' ? '<span style="color:var(--green)">✓</span>'
+            : att.status === 'failed' ? '<span style="color:var(--red)">✗</span>'
+            : att.status === 'diagnosing' ? '<span class="spinner" style="width:10px;height:10px;display:inline-block;vertical-align:middle"></span>'
+            : att.status === 'fixing' ? '<span class="spinner" style="width:10px;height:10px;display:inline-block;vertical-align:middle"></span>'
+            : '';
+
+        const statusLabel = {
+            deploying: t('deploy.step.build'),
+            success: t('deploy.success'),
+            failed: t('deploy.buildFail'),
+            diagnosing: t('deploy.diagnosing'),
+            fixing: t('deploy.fixing')
+        }[att.status] || att.status;
+
+        let bodyHtml = '';
+        if (!collapsed) {
+            if (att.reasoning) {
+                bodyHtml += `<div style="margin-bottom:.3rem"><span style="font-size:.65rem;font-weight:700;text-transform:uppercase;color:var(--text-m)">${t('deploy.reasoning')}</span></div>`;
+                bodyHtml += `<div class="deploy-reasoning">${escHtml(att.reasoning)}</div>`;
+            }
+            if (att.fixDescription) {
+                bodyHtml += `<div class="deploy-fix-desc">✓ ${escHtml(att.fixDescription)}</div>`;
+            }
+            if (att.userAction) {
+                bodyHtml += `<div class="deploy-user-action">${escHtml(att.userAction)}</div>`;
+            }
+            if (att.logs) {
+                bodyHtml += `<div class="deploy-logs-preview">${escHtml(att.logs)}</div>`;
+            }
+        }
+
+        return `<div class="deploy-attempt ${att.status} ${collapsed ? 'collapsed' : ''}" data-attempt="${att.id}">
+            <div class="deploy-attempt-header" onclick="toggleAttemptCollapse(${att.id})">
+                <div class="deploy-attempt-title">
+                    ${statusIcon}
+                    <span>${t('deploy.attempt')} ${att.id}</span>
+                    <span class="deploy-attempt-status ${att.status}">${statusLabel}</span>
+                </div>
+                <span class="deploy-attempt-time">${timeStr}</span>
+            </div>
+            ${bodyHtml ? `<div class="deploy-attempt-body">${bodyHtml}</div>` : ''}
+        </div>`;
+    }).join('');
+
+    // Final card if max attempts reached
+    let finalHtml = '';
+    if (activeDeploy.done && activeDeploy.attempts.length >= activeDeploy.maxAttempts) {
+        const lastAtt = currentAttempt();
+        if (lastAtt && lastAtt.status === 'failed') {
+            finalHtml = `<div class="deploy-final-card">
+                <div class="deploy-final-card-title">${t('deploy.manualRequired')}</div>
+                <div class="deploy-final-card-body">${lastAtt.userAction ? escHtml(lastAtt.userAction) : t('deploy.triedNFixes').replace('{n}', activeDeploy.maxAttempts)}</div>
+            </div>`;
+        }
+    }
+
+    const dismissHtml = activeDeploy.done
+        ? `<div style="text-align:center;margin-top:1rem"><button class="section-btn" onclick="closeDeployPanel()">${t('deploy.dismiss')}</button></div>`
+        : '';
+
+    body.innerHTML = `<div class="deploy-attempts">${attemptsHtml}</div>${finalHtml}${dismissHtml}`;
+
+    // Show chat when there's an error or deploy is done
+    const chatEl = document.getElementById('deployChat');
+    const chatInput = document.getElementById('deployChatInput');
+    if (chatEl) {
+        const hasError = activeDeploy.attempts.some(a => a.status === 'failed');
+        chatEl.style.display = (hasError || activeDeploy.done) ? 'block' : 'none';
+        if (chatInput && !chatInput.placeholder) chatInput.placeholder = t('deploy.chatPlaceholder');
+    }
+}
+
+function toggleAttemptCollapse(attemptId) {
+    if (!activeDeploy) return;
+    const att = activeDeploy.attempts.find(a => a.id === attemptId);
+    if (att) {
+        att.collapsed = !att.collapsed;
+        renderDeployPanel();
+    }
+}
+
+async function sendDeployChat() {
+    if (!activeDeploy) return;
+    const input = document.getElementById('deployChatInput');
+    const msgArea = document.getElementById('deployChatMessages');
+    const sendBtn = document.getElementById('deployChatSend');
+    if (!input || !msgArea) return;
+
+    const instruction = input.value.trim();
+    if (!instruction) return;
+
+    msgArea.innerHTML += `<div class="deploy-chat-msg user">${escHtml(instruction)}</div>`;
+    input.value = '';
+    sendBtn.disabled = true;
+
+    msgArea.innerHTML += `<div class="deploy-chat-msg ai" id="chatThinking"><span class="spinner" style="width:10px;height:10px;display:inline-block;vertical-align:middle;margin-right:.3rem"></span>${t('deploy.aiThinking')}</div>`;
+    msgArea.scrollTop = msgArea.scrollHeight;
+
+    try {
+        const res = await fetch('/api/Ai/agent-fix', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                serviceSlug: activeDeploy.slug,
+                previousAttempts: activeDeploy.previousAttempts,
+                userInstruction: instruction,
+                language: currentLang
+            })
+        });
+
+        document.getElementById('chatThinking')?.remove();
+
+        if (!res.ok) {
+            msgArea.innerHTML += `<div class="deploy-chat-msg ai">${t('ai.error')}</div>`;
+            sendBtn.disabled = false;
+            return;
+        }
+
+        const data = await res.json();
+
+        if (data.fix) {
+            msgArea.innerHTML += `<div class="deploy-chat-msg ai fix">✓ ${escHtml(data.fix.description)}</div>`;
+            msgArea.scrollTop = msgArea.scrollHeight;
+            activeDeploy.previousAttempts.push({ fixDescription: data.fix.description, resultLogs: '' });
+
+            msgArea.innerHTML += `<div class="deploy-chat-msg ai">${t('deploy.fixApplied')}</div>`;
+            await fetch('/api/Ai/fix-and-redeploy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ serviceSlug: activeDeploy.slug, fixedYaml: null })
+            });
+
+            startNewDeployRound();
+        } else {
+            msgArea.innerHTML += `<div class="deploy-chat-msg ai">${escHtml(data.userActionRequired || data.reasoning)}</div>`;
+        }
+
+        msgArea.scrollTop = msgArea.scrollHeight;
+    } catch (err) {
+        document.getElementById('chatThinking')?.remove();
+        msgArea.innerHTML += `<div class="deploy-chat-msg ai">${t('ai.error')}: ${escHtml(err.message)}</div>`;
+    }
+
+    sendBtn.disabled = false;
+}
+
+function updateDeployFromSignalR(data) {
+    if (!activeDeploy || activeDeploy.slug !== data.slug || activeDeploy.done) return;
+
+    const att = currentAttempt();
+    if (!att || att.status !== 'deploying') return;
+
+    if (data.status === 'failed') {
+        att.status = 'failed';
+        att.endTime = Date.now();
+        att.logs = data.message || t('deploy.buildFail');
+        renderDeployPanel();
+    }
+}
+
 // ─── Onboarding Wizard ───
 let catalogData = null;
 
@@ -20,6 +255,7 @@ let wizardState = { source: null, aiProjectPath: null, aiAnalysis: null };
 async function openOnboardingWizard() {
     const catalog = await loadCatalog();
     const categories = [...new Set(catalog.map(c => c.category))].sort();
+    const tCatWiz = (name) => { const map = {'Media':'cat.media','Development':'cat.development','Monitoring':'cat.monitoring','Productivity':'cat.productivity','Security':'cat.security','AI/ML':'cat.ai_ml','Storage':'cat.storage','Networking':'cat.networking'}; return map[name] ? t(map[name]) : name; };
     wizardState = { source: null, aiProjectPath: null, aiAnalysis: null };
 
     const overlay = document.createElement('div');
@@ -52,7 +288,7 @@ async function openOnboardingWizard() {
                     <div class="wizard-panel" data-panel="catalog">
                         <div class="cat-chips" id="catChips">
                             <button class="cat-chip active" data-cat="">${t('misc.all')}</button>
-                            ${categories.map(c => `<button class="cat-chip" data-cat="${c}">${c}</button>`).join('')}
+                            ${categories.map(c => `<button class="cat-chip" data-cat="${c}">${tCatWiz(c)}</button>`).join('')}
                         </div>
                         <div class="catalog-grid" id="catalogGrid">
                             ${renderCatalogItems(catalog)}
@@ -69,14 +305,30 @@ async function openOnboardingWizard() {
                             </div>
                             <!-- AI Step 1: Select Project -->
                             <div class="ai-step-panel active" data-ai-step-panel="1">
-                                <div class="dir-breadcrumb" id="aiBreadcrumb"></div>
-                                <div class="dir-tree" id="aiDirTree"><div style="padding:1rem;color:var(--text-m)"><span class="spinner"></span> Loading...</div></div>
-                                <div id="aiSelectedPath" style="margin-top:.6rem;font-size:.8rem;color:var(--text-d);display:none">
-                                    <strong>${t('ai.selectedPath')}:</strong> <span id="aiSelectedPathVal"></span>
-                                </div>
-                                <div class="wizard-nav" style="margin-top:.8rem">
-                                    <span></span>
-                                    <button class="section-btn primary" id="aiAnalyzeBtn" disabled onclick="startAiAnalysis()">${t('ai.analyze')} →</button>
+                                <div class="ai-explorer">
+                                    <div class="ai-explorer-toolbar">
+                                        <button class="ai-nav-btn" onclick="loadHostDrives()" title="${t('ai.thisComputer')}">
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                        </button>
+                                        <button class="ai-nav-btn" onclick="loadAiDirectories('/app/project')" title="${t('ai.home')}">
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+                                        </button>
+                                        <button class="ai-nav-btn" id="aiUpBtn" onclick="navigateUp()" title="${t('wizard.back')}">
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                                        </button>
+                                        <div class="ai-path-bar" id="aiBreadcrumb"></div>
+                                    </div>
+                                    <div class="ai-explorer-body">
+                                        <div class="dir-tree" id="aiDirTree"><div style="padding:1rem;color:var(--text-m)"><span class="spinner"></span> ${t('containers.loading')}</div></div>
+                                    </div>
+                                    <div class="ai-explorer-footer">
+                                        <div class="ai-path-input-row">
+                                            <span style="font-size:.7rem;font-weight:600;color:var(--text-m);white-space:nowrap">${t('ai.selectedPath')}:</span>
+                                            <input type="text" id="aiPathInput" class="ai-path-input" placeholder="${t('ai.pathPlaceholder')}" autocomplete="off"
+                                                onkeydown="if(event.key==='Enter'){let v=this.value.trim();if(v){v=convertWindowsPath(v);loadAiDirectories(v);}}">
+                                        </div>
+                                        <button class="section-btn primary" id="aiAnalyzeBtn" disabled onclick="startAiAnalysis()">${t('ai.analyze')} →</button>
+                                    </div>
                                 </div>
                             </div>
                             <!-- AI Step 2: Analyzing -->
@@ -94,7 +346,7 @@ async function openOnboardingWizard() {
                     <div class="wizard-panel" data-panel="manual">
                         <div style="text-align:center;padding:2rem">
                             <p style="color:var(--text-d);margin-bottom:1rem;font-size:.85rem">${t('wizard.manualDesc')}</p>
-                            <button class="section-btn primary" onclick="goToPhase2({source:'manual'})">Configure →</button>
+                            <button class="section-btn primary" onclick="goToPhase2({source:'manual'})">${t('misc.configure')} →</button>
                         </div>
                     </div>
                 </div>
@@ -106,7 +358,7 @@ async function openOnboardingWizard() {
                     <div class="svc-form">
                         <div class="svc-form-row"><label>${t('wizard.name')}</label><input id="cfgName" placeholder="${t('wizard.namePlaceholder')}"></div>
                         <div class="svc-form-row"><label>${t('wizard.image')}</label><input id="cfgImage" placeholder="${t('wizard.imagePlaceholder')}"></div>
-                        <div class="svc-form-row"><label>Build Context</label><input id="cfgBuild" placeholder="./my-project (image yerine)"></div>
+                        <div class="svc-form-row"><label>${t('wizard.buildContext')}</label><input id="cfgBuild" placeholder="${t('wizard.buildPlaceholder')}"></div>
                         <div class="svc-form-row"><label>${t('wizard.desc')}</label><input id="cfgDesc" placeholder="${t('wizard.descPlaceholder')}"></div>
                         <div class="svc-form-grid">
                             <div class="svc-form-row"><label>${t('wizard.icon')}</label>
@@ -331,6 +583,21 @@ function goToPhase1() {
     if (!overlay) return;
     overlay.querySelector('#wizardPhase1').style.display = 'block';
     overlay.querySelector('#wizardPhase2').style.display = 'none';
+
+    // Reset AI wizard step back to step 1 so it doesn't stay on "Analyzing..."
+    if (aiWizardOverlay) {
+        aiGoToStep(1);
+        // Restore the step 2 panel content (it gets replaced on error)
+        const step2Panel = aiWizardOverlay.querySelector('[data-ai-step-panel="2"]');
+        if (step2Panel) {
+            step2Panel.innerHTML = `
+                <div class="ai-loading" style="text-align:center;padding:2rem">
+                    <div><span class="spinner" style="width:32px;height:32px"></span></div>
+                    <div style="margin-top:1rem;color:var(--text-d)">${t('ai.analyzing')}</div>
+                    <div id="aiScanList" class="ai-scan-list" style="margin-top:1rem;text-align:left"></div>
+                </div>`;
+        }
+    }
 }
 
 // ─── Unified Row Helpers ───
@@ -451,8 +718,6 @@ async function doUnifiedDeploy() {
     const btn = overlay.querySelector('#cfgDeployBtn');
     btn.disabled = true;
     btn.innerHTML = `<span class="spinner"></span> ${t('wizard.deployProgress')}`;
-    const progress = overlay.querySelector('#cfgDeployProgress');
-    if (progress) progress.style.display = 'block';
 
     try {
         // AI source: write Dockerfile if generated
@@ -467,9 +732,12 @@ async function doUnifiedDeploy() {
             }
         }
 
+        const icon = overlay.querySelector('#cfgIcon')?.value?.trim() || null;
+        const color = overlay.querySelector('#cfgColor')?.value || '#6366f1';
         const body = {
             name, image, buildContext, ports, envVars, volumes,
             description: overlay.querySelector('#cfgDesc').value.trim(),
+            icon, color,
             environment: null, dependsOn: null
         };
         if (wizardState.category) body.category = wizardState.category;
@@ -481,19 +749,291 @@ async function doUnifiedDeploy() {
         });
         const data = await res.json();
         if (data.ok) {
-            showToast(`${name} ${t('msg.deploying')}`, 'success');
+            const slug = data.containerName || name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+            // Close wizard modal, open deploy panel
             if (close) close();
-            fetchAll();
+            openDeployPanel(slug, name);
+            // Start monitoring in the panel
+            monitorDeployHealth(slug, name);
         } else {
             showToast(`${t('msg.deployFail')}: ` + (data.error || ''), 'error');
-            if (progress) progress.style.display = 'none';
+            btn.disabled = false;
+            btn.textContent = 'Deploy →';
         }
     } catch (err) {
         showToast(`${t('msg.deployFail')}: ` + err.message, 'error');
-        if (progress) progress.style.display = 'none';
+        btn.disabled = false;
+        btn.textContent = 'Deploy →';
     }
-    btn.disabled = false;
-    btn.textContent = 'Deploy →';
+}
+
+async function monitorDeployHealth(slug, name) {
+    const BUILD_TIMEOUT = 120;
+    const HEALTH_TIMEOUT = 20;
+
+    if (!activeDeploy || activeDeploy.slug !== slug) return;
+    activeDeploy.monitorAbort = false;
+
+    let buildPhase = true;
+    let healthChecks = 0;
+    let wasRunning = false;
+
+    for (let tick = 0; tick < BUILD_TIMEOUT; tick++) {
+        if (!activeDeploy || activeDeploy.slug !== slug || activeDeploy.monitorAbort || activeDeploy.done) return;
+
+        await new Promise(r => setTimeout(r, 3000));
+        if (!activeDeploy || activeDeploy.slug !== slug || activeDeploy.monitorAbort || activeDeploy.done) return;
+
+        const att = currentAttempt();
+        if (!att || att.status !== 'deploying') return;
+
+        try {
+            const cRes = await fetch('/api/Containers');
+            if (!cRes.ok) continue;
+            const ctrs = await cRes.json();
+            const ctr = ctrs.find(c => c.name === slug || c.name === name.toLowerCase().replace(/[^a-z0-9-]/g, '-'));
+
+            if (!ctr) continue;
+
+            if (buildPhase) { buildPhase = false; healthChecks = 0; }
+            healthChecks++;
+
+            if (ctr.state === 'running') {
+                wasRunning = true;
+                const svcPort = ctr.ports?.find(p => p.public)?.public;
+                if (svcPort) {
+                    try {
+                        const hc = await fetch(`/api/proxy/${svcPort}/`, { signal: AbortSignal.timeout(3000) });
+                        // Any HTTP response means server is up (even 404 — no root route but server works)
+                        if (hc.status > 0 && hc.status < 500) {
+                            const stable = await postDeployStabilityCheck(slug, name);
+                            if (stable) {
+                                att.status = 'success';
+                                att.endTime = Date.now();
+                                stopDeployTimer();
+                                renderDeployPanel();
+                                showToast(`${name} ${t('msg.deployOk')}`, 'success');
+                                // Auto-detect urlPath if root returns 404
+                                if (hc.status === 404) {
+                                    autoDetectUrlPath(slug, svcPort);
+                                }
+                            } else {
+                                await runDeployDiagnosis(slug, name);
+                            }
+                            fetchAll();
+                            return;
+                        }
+                    } catch { /* not ready yet */ }
+
+                    if (healthChecks > HEALTH_TIMEOUT) {
+                        await runDeployDiagnosis(slug, name);
+                        fetchAll();
+                        return;
+                    }
+                } else {
+                    if (healthChecks >= 3) {
+                        const stable = await postDeployStabilityCheck(slug, name);
+                        if (stable) {
+                            att.status = 'success';
+                            att.endTime = Date.now();
+                            stopDeployTimer();
+                            renderDeployPanel();
+                            showToast(`${name} ${t('msg.deployOk')}`, 'success');
+                        } else {
+                            await runDeployDiagnosis(slug, name);
+                        }
+                        fetchAll();
+                        return;
+                    }
+                }
+                continue;
+            }
+
+            if (healthChecks > HEALTH_TIMEOUT) {
+                await runDeployDiagnosis(slug, name);
+                fetchAll();
+                return;
+            }
+
+            if (ctr.state === 'restarting' || (ctr.state === 'exited' && (healthChecks > 3 || wasRunning))) {
+                await runDeployDiagnosis(slug, name);
+                return;
+            }
+        } catch { continue; }
+    }
+
+    // Timeout
+    const att = currentAttempt();
+    if (att) {
+        att.status = 'failed';
+        att.endTime = Date.now();
+        att.logs = `${t('deploy.buildFail')} — timeout (${BUILD_TIMEOUT * 3}s)`;
+    }
+    stopDeployTimer();
+    renderDeployPanel();
+    fetchAll();
+}
+
+async function postDeployStabilityCheck(slug, name) {
+    for (let i = 0; i < 4; i++) {
+        await new Promise(r => setTimeout(r, 3000));
+        if (!activeDeploy || activeDeploy.slug !== slug) return true;
+        try {
+            const cRes = await fetch('/api/Containers');
+            if (!cRes.ok) continue;
+            const ctrs = await cRes.json();
+            const ctr = ctrs.find(c => c.name === slug || c.name === name.toLowerCase().replace(/[^a-z0-9-]/g, '-'));
+            if (!ctr || ctr.state === 'exited' || ctr.state === 'restarting') return false;
+        } catch { continue; }
+    }
+    return true;
+}
+
+// AI-powered urlPath detection when root "/" returns 404
+async function autoDetectUrlPath(slug, port) {
+    try {
+        const res = await fetch('/api/Ai/detect-url-path', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ serviceSlug: slug })
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.urlPath) return;
+
+        // Verify the detected path actually works
+        try {
+            const check = await fetch(`/api/proxy/${port}${data.urlPath}`, { signal: AbortSignal.timeout(3000) });
+            if (!check.ok) return;
+        } catch { return; }
+
+        // Update service urlPath
+        const svcRes = await fetch('/api/Services');
+        if (!svcRes.ok) return;
+        const services = await svcRes.json();
+        const svc = services.find(s => s.containerName === slug || s.serviceSlug === slug);
+        if (svc && svc.id) {
+            await fetch(`/api/Services/${svc.id}/url-path`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ urlPath: data.urlPath })
+            });
+            showToast(`URL path: ${data.urlPath}`, 'info');
+        }
+    } catch {}
+}
+
+async function runDeployDiagnosis(slug, name) {
+    if (!activeDeploy || activeDeploy.slug !== slug) return;
+
+    const att = currentAttempt();
+    if (!att) return;
+
+    // Attach result logs to the previous attempt so AI knows what happened after its fix
+    if (activeDeploy.previousAttempts.length > 0) {
+        const lastPrev = activeDeploy.previousAttempts[activeDeploy.previousAttempts.length - 1];
+        if (!lastPrev.resultLogs) {
+            lastPrev.resultLogs = `Container crashed/failed again after this fix was applied (attempt ${activeDeploy.attempts.length})`;
+        }
+    }
+
+    att.status = 'diagnosing';
+    att.endTime = null;
+    renderDeployPanel();
+
+    if (activeDeploy.attempts.length > activeDeploy.maxAttempts) {
+        att.status = 'failed';
+        att.endTime = Date.now();
+        activeDeploy.done = true;
+        renderDeployPanel();
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/Ai/agent-fix', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                serviceSlug: slug,
+                previousAttempts: activeDeploy.previousAttempts,
+                language: currentLang
+            })
+        });
+
+        if (!res.ok) {
+            att.status = 'failed';
+            att.endTime = Date.now();
+            att.reasoning = t('wizard.deployMonitor.diagFail');
+            stopDeployTimer();
+            renderDeployPanel();
+            return;
+        }
+
+        const data = await res.json();
+        att.reasoning = data.reasoning;
+
+        if (data.fix) {
+            att.fixDescription = data.fix.description;
+            att.status = 'fixing';
+            renderDeployPanel();
+
+            // Record for future AI calls (resultLogs will be filled after redeploy if it fails again)
+            activeDeploy.previousAttempts.push({ fixDescription: data.fix.description, resultLogs: '' });
+
+            // Collapse this attempt, start a new one
+            att.endTime = Date.now();
+            att.status = 'failed';
+            att.collapsed = true;
+
+            // Redeploy
+            await fetch('/api/Ai/fix-and-redeploy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ serviceSlug: slug, fixedYaml: null })
+            });
+
+            startNewDeployRound();
+        } else {
+            att.userAction = data.userActionRequired;
+            att.status = 'failed';
+            att.endTime = Date.now();
+            activeDeploy.done = true;
+            stopDeployTimer();
+            renderDeployPanel();
+        }
+    } catch (err) {
+        att.status = 'failed';
+        att.endTime = Date.now();
+        att.reasoning = `${t('wizard.deployMonitor.diagFail')}: ${err.message}`;
+        stopDeployTimer();
+        renderDeployPanel();
+    }
+}
+
+function startNewDeployRound() {
+    if (!activeDeploy) return;
+    activeDeploy.done = false;
+
+    // Add new attempt
+    const newId = activeDeploy.attempts.length + 1;
+    activeDeploy.attempts.push({
+        id: newId, status: 'deploying', startTime: Date.now(), endTime: null,
+        reasoning: null, fixDescription: null, userAction: null, logs: null, collapsed: false
+    });
+
+    if (!activeDeploy.timerInterval) {
+        activeDeploy.timerInterval = setInterval(() => {
+            if (!activeDeploy || activeDeploy.done) return;
+            const elapsed = Math.floor((Date.now() - activeDeploy.startTime) / 1000);
+            const mins = Math.floor(elapsed / 60);
+            const secs = elapsed % 60;
+            const timerEl = document.getElementById('deployTimer');
+            if (timerEl) timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')} ${t('deploy.elapsed')}`;
+        }, 1000);
+    }
+
+    renderDeployPanel();
+    monitorDeployHealth(activeDeploy.slug, activeDeploy.name);
 }
 
 // ─── AI Wizard Logic ───
@@ -530,74 +1070,151 @@ async function initAiWizard(overlay) {
         // If status check fails, still show the directory picker
     }
 
-    // Load root directories
-    loadAiDirectories('/app/project');
+    // Start with host drives view (This Computer)
+    loadHostDrives();
 }
+
+let aiCurrentPath = null; // track current directory for back navigation
 
 async function loadAiDirectories(path) {
     const tree = aiWizardOverlay?.querySelector('#aiDirTree');
     if (!tree) return;
-    tree.innerHTML = '<div style="padding:.5rem;color:var(--text-m)"><span class="spinner"></span></div>';
+    tree.innerHTML = '<div style="padding:.8rem;text-align:center;color:var(--text-m)"><span class="spinner"></span></div>';
+    aiCurrentPath = path;
 
     try {
         const res = await fetch(`/api/Ai/directories?path=${encodeURIComponent(path)}`);
         if (!res.ok) throw new Error();
         const dirs = await res.json();
 
-        // Update breadcrumb
         updateAiBreadcrumb(path);
+        updatePathInput(path);
 
         if (!dirs.length) {
-            tree.innerHTML = '<div style="padding:1rem;color:var(--text-m)">No subdirectories found</div>';
+            tree.innerHTML = `<div style="padding:1.5rem;text-align:center;color:var(--text-m);font-size:.8rem">${t('msg.noResults')}</div>`;
             return;
         }
 
         tree.innerHTML = dirs.map(d => `
             <div class="dir-item ${d.isProject ? 'project' : ''}" data-path="${escHtml(d.path)}" data-hassub="${d.hasSubdirs}">
-                <span class="dir-item-icon">${d.hasSubdirs ? '📁' : '📄'}</span>
+                <svg class="dir-item-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    ${d.isProject
+                        ? '<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" fill="rgba(99,102,241,.15)" stroke="var(--accent)"/>'
+                        : d.hasSubdirs
+                        ? '<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>'
+                        : '<path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/><polyline points="13 2 13 9 20 9"/>'}
+                </svg>
                 <span class="dir-item-name">${escHtml(d.name)}</span>
-                ${d.isProject ? '<span class="dir-item-badge">Project ✓</span>' : ''}
+                ${d.isProject ? `<span class="dir-item-badge">${t('ai.projectDetected')}</span>` : ''}
+                ${d.hasSubdirs ? '<svg class="dir-item-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-m)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>' : ''}
             </div>
         `).join('');
 
         tree.querySelectorAll('.dir-item').forEach(item => {
             item.addEventListener('click', () => {
                 const itemPath = item.dataset.path;
-                // Toggle selection
                 tree.querySelectorAll('.dir-item').forEach(i => i.classList.remove('selected'));
                 item.classList.add('selected');
                 aiSelectedProjectPath = itemPath;
-                const selEl = aiWizardOverlay.querySelector('#aiSelectedPath');
-                selEl.style.display = 'block';
-                aiWizardOverlay.querySelector('#aiSelectedPathVal').textContent = itemPath;
+                updatePathInput(itemPath);
                 aiWizardOverlay.querySelector('#aiAnalyzeBtn').disabled = false;
             });
             item.addEventListener('dblclick', () => {
-                const itemPath = item.dataset.path;
                 if (item.dataset.hassub === 'true') {
-                    loadAiDirectories(itemPath);
+                    loadAiDirectories(item.dataset.path);
                 }
             });
         });
     } catch {
-        tree.innerHTML = '<div style="padding:1rem;color:var(--red)">Failed to load directories</div>';
+        tree.innerHTML = `<div style="padding:1rem;text-align:center;color:var(--red);font-size:.8rem">${t('ai.dirLoadFail')}</div>`;
     }
+}
+
+async function loadHostDrives() {
+    const tree = aiWizardOverlay?.querySelector('#aiDirTree');
+    if (!tree) return;
+    tree.innerHTML = '<div style="padding:.8rem;text-align:center;color:var(--text-m)"><span class="spinner"></span></div>';
+    aiCurrentPath = null;
+
+    try {
+        const res = await fetch('/api/Ai/host-drives');
+        if (!res.ok) throw new Error();
+        const drives = await res.json();
+
+        const bc = aiWizardOverlay?.querySelector('#aiBreadcrumb');
+        if (bc) bc.innerHTML = `<span style="font-size:.75rem;color:var(--text-d);font-weight:600">${t('ai.thisComputer')}</span>`;
+        updatePathInput('');
+
+        if (!drives.length) {
+            tree.innerHTML = `<div style="padding:1.5rem;text-align:center;color:var(--text-m);font-size:.8rem">${t('msg.noResults')}</div>`;
+            return;
+        }
+
+        tree.innerHTML = `<div class="ai-drives-grid">${drives.map(d => `
+            <div class="ai-drive-card ${d.accessible ? '' : 'disabled'}" data-path="${escHtml(d.path)}">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="14" x2="22" y2="14"/><circle cx="17" cy="18" r="1"/></svg>
+                <div class="ai-drive-label">${escHtml(d.name)}</div>
+            </div>
+        `).join('')}</div>`;
+
+        tree.querySelectorAll('.ai-drive-card:not(.disabled)').forEach(card => {
+            card.addEventListener('click', () => loadAiDirectories(card.dataset.path));
+        });
+    } catch {
+        tree.innerHTML = `<div style="padding:1rem;text-align:center;color:var(--red);font-size:.8rem">${t('ai.dirLoadFail')}</div>`;
+    }
+}
+
+function navigateUp() {
+    if (!aiCurrentPath || aiCurrentPath === '/') { loadHostDrives(); return; }
+    const parent = aiCurrentPath.replace(/\/[^/]+\/?$/, '') || '/';
+    if (parent === '/hostfs') { loadHostDrives(); return; }
+    loadAiDirectories(parent);
+}
+
+function updatePathInput(path) {
+    const input = aiWizardOverlay?.querySelector('#aiPathInput');
+    if (input) input.value = path || '';
+}
+
+function convertWindowsPath(winPath) {
+    // Convert C:\Users\... → /hostfs/c/Users/...
+    const match = winPath.match(/^([A-Za-z]):[\\\/](.*)/);
+    if (match) {
+        const drive = match[1].toLowerCase();
+        const rest = match[2].replace(/\\/g, '/');
+        return `/hostfs/${drive}/${rest}`;
+    }
+    return winPath;
 }
 
 function updateAiBreadcrumb(path) {
     const bc = aiWizardOverlay?.querySelector('#aiBreadcrumb');
     if (!bc) return;
-    const base = '/app/project';
-    const rel = path.startsWith(base) ? path.slice(base.length) : path;
-    const parts = rel.split('/').filter(Boolean);
+    const parts = path.split('/').filter(Boolean);
+    const isHostfs = parts[0] === 'hostfs';
+    let html = '';
 
-    let html = `<span class="dir-bc-item" onclick="loadAiDirectories('${escHtml(base)}')">/app/project</span>`;
-    let currentPath = base;
-    for (const part of parts) {
-        currentPath += '/' + part;
-        html += ` <span class="dir-bc-sep">/</span> <span class="dir-bc-item" onclick="loadAiDirectories('${escHtml(currentPath)}')">${escHtml(part)}</span>`;
+    if (isHostfs) {
+        html = `<span class="dir-bc-item" onclick="loadHostDrives()">${t('ai.thisComputer')}</span>`;
+        for (let i = 1; i < parts.length; i++) {
+            const cp = '/hostfs/' + parts.slice(1, i + 1).join('/');
+            const label = (i === 1) ? parts[i].toUpperCase() + ':' : parts[i];
+            html += `<span class="dir-bc-sep">›</span><span class="dir-bc-item" onclick="loadAiDirectories('${escHtml(cp)}')">${escHtml(label)}</span>`;
+        }
+    } else {
+        html = `<span class="dir-bc-item" onclick="loadAiDirectories('/')">/</span>`;
+        let cp = '';
+        for (const part of parts) {
+            cp += '/' + part;
+            html += `<span class="dir-bc-sep">›</span><span class="dir-bc-item" onclick="loadAiDirectories('${escHtml(cp)}')">${escHtml(part)}</span>`;
+        }
     }
     bc.innerHTML = html;
+
+    // Update path input
+    const pathInput = aiWizardOverlay?.querySelector('#aiPathInput');
+    if (pathInput) pathInput.value = path;
 }
 
 async function startAiAnalysis() {
@@ -625,11 +1242,40 @@ async function startAiAnalysis() {
         const aiPorts = (result.ports || []).map(p => ({
             host: String(p.host), container: String(p.container), exposed: true
         }));
+        // Use the selected project path directly as build context
+        // AI may return relative paths like "./subdir" but the selected path is already the project root
+        let buildCtx = result.buildContext || '';
+        if (aiSelectedProjectPath) {
+            if (!buildCtx || buildCtx === '.' || buildCtx === './') {
+                // Project IS the selected directory
+                buildCtx = aiSelectedProjectPath;
+            } else if (!buildCtx.startsWith('/')) {
+                // AI says project is in a subdirectory — but user already selected the project folder
+                // Use selected path directly (user picked the project, not its parent)
+                buildCtx = aiSelectedProjectPath;
+            }
+            // If AI returned an absolute path, keep it
+        }
         goToPhase2({
             source: 'ai', name: result.serviceName,
-            image: result.image || '', buildContext: result.buildContext || '',
+            image: result.image || '', buildContext: buildCtx,
             description: result.explanation || '', ports: aiPorts,
-            envVars: result.envVars || {}, volumes: result.volumes || [],
+            envVars: result.envVars || {},
+            volumes: (result.volumes || []).map(v => {
+                // Convert relative volume host paths to absolute using selected project path
+                if (!aiSelectedProjectPath) return v;
+                const colonIdx = v.indexOf(':');
+                if (colonIdx <= 0) return v;
+                const hostPart = v.substring(0, colonIdx);
+                const rest = v.substring(colonIdx);
+                if (hostPart === '.' || hostPart === './') {
+                    return aiSelectedProjectPath + rest;
+                }
+                if (hostPart.startsWith('./')) {
+                    return aiSelectedProjectPath + '/' + hostPart.slice(2) + rest;
+                }
+                return v;
+            }),
             dockerfile: result.dockerfile || null,
             aiProjectPath: aiSelectedProjectPath, aiAnalysis: result
         });

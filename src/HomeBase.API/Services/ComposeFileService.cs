@@ -39,9 +39,13 @@ public class ComposeFileService
             sb.AppendLine($"    image: {def.Image}");
         else if (!string.IsNullOrEmpty(def.BuildContext))
         {
-            // Build context is relative to project dir, compute relative path from services/{slug}
-            var relPath = Path.GetRelativePath(dir, Path.Combine(ProjectDir, def.BuildContext)).Replace('\\', '/');
-            sb.AppendLine($"    build: {relPath}");
+            // Build context: if absolute path (e.g. /hostfs/...), use as-is; otherwise relative to project dir
+            string buildPath;
+            if (Path.IsPathRooted(def.BuildContext))
+                buildPath = def.BuildContext;
+            else
+                buildPath = Path.GetRelativePath(dir, Path.Combine(ProjectDir, def.BuildContext)).Replace('\\', '/');
+            sb.AppendLine($"    build: {buildPath}");
         }
 
         var containerName = def.ContainerName ?? svc.ServiceSlug;
@@ -74,12 +78,9 @@ public class ComposeFileService
             }
         }
 
-        if (def.DependsOn.Count > 0)
-        {
-            sb.AppendLine("    depends_on:");
-            foreach (var dep in def.DependsOn)
-                sb.AppendLine($"      - {dep}");
-        }
+        // depends_on: only include services defined in THIS compose (skip external infra like postgres)
+        // Per-service compose only has one service, so depends_on to external services is invalid
+        // External services are reachable via the shared 'homebase' network
 
         if (!string.IsNullOrEmpty(def.Command))
             sb.AppendLine($"    command: {def.Command}");
@@ -187,6 +188,10 @@ public class ComposeFileService
 
         var hostPart = vol[..colonIdx];
         var rest = vol[colonIdx..];
+
+        // Absolute paths (e.g. /hostfs/c/...) — keep as-is
+        if (Path.IsPathRooted(hostPart))
+            return vol;
 
         if (hostPart.StartsWith("./") || hostPart.StartsWith("../"))
         {

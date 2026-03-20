@@ -59,7 +59,7 @@ document.querySelectorAll('.stat-card[data-chart]').forEach(card => {
         const type = card.dataset.chart;
         if (!type) return;
         const data = type === 'cpu' ? cpuH : memH;
-        const label = type === 'cpu' ? 'CPU (%)' : 'Memory (MB)';
+        const label = type === 'cpu' ? t('chart.cpu') : t('chart.memory');
         const color = type === 'cpu' ? '#6366f1' : '#10b981';
         showExpandedChart(label, data, color);
     });
@@ -72,7 +72,7 @@ function showExpandedChart(label, data, color) {
     overlay.innerHTML = `
         <div class="chart-expanded-inner">
             <div class="chart-expanded-header">
-                <h3>${label} — Son ${data.length * 5}s</h3>
+                <h3>${label} — ${t('chart.last')} ${data.length * 5}s</h3>
                 <button class="chart-expanded-close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
             <div class="chart-expanded-body" id="expandedChartBody"></div>
@@ -154,7 +154,7 @@ function buildCardHtml(svc) {
     // Image tag display
     const imageTag = svc.image ? `<div class="svc-image-tag" title="${escHtml(svc.image)}">${escHtml(svc.image)}</div>` : '';
     // Category badge
-    const catBadge = svc.category ? `<span class="svc-category">${escHtml(svc.category)}</span>` : '';
+    const catBadge = svc.category ? `<span class="svc-category">${escHtml(tCat(svc.category))}</span>` : '';
 
     return `<div class="svc-accent" style="background:${svc.color}"></div>
         <a class="svc-body" href="${up && !busy && !noUrl ? url : '#'}" target="${up && !busy && !noUrl ? '_blank' : ''}" ${!up || busy || noUrl ? 'onclick="return false"' : ''} ${noUrl && up ? `title="${t('msg.noPortConfigured')}"` : ''}>
@@ -169,7 +169,7 @@ function buildCardHtml(svc) {
                         : busy
                         ? `<span class="badge transition"><span class="spinner"></span>${stopping ? t('status.stopping') : t('status.starting')}</span>`
                         : c?.state === 'exited'
-                        ? `<span class="badge down" style="background:#f59e0b20;color:#f59e0b"><span class="badge-dot" style="background:#f59e0b"></span>Exited</span>`
+                        ? `<span class="badge exited"><span class="badge-dot"></span>${t('status.exited')}</span>`
                         : `<span class="badge ${up?'up':'down'}"><span class="badge-dot"></span>${up?t('status.online'):t('status.offline')}</span>`
                     }
                 </div>
@@ -179,7 +179,7 @@ function buildCardHtml(svc) {
                     <div class="metric"><span class="metric-lbl">CPU</span><span class="metric-val">${cpu}% <span class="bar"><span class="bar-fill ${barCls(cpu)}" style="width:${Math.min(cpu,100)}%"></span></span></span></div>
                     <div class="metric"><span class="metric-lbl">MEM</span><span class="metric-val">${mem}MB <span class="bar"><span class="bar-fill ${barCls(mp)}" style="width:${Math.min(mp,100)}%"></span></span></span></div>
                     <div class="metric"><span class="metric-lbl">UP</span><span class="metric-val">${c.status.replace('Up ','')}</span></div>
-                </div>` : !busy ? `<div class="svc-metrics"><div class="metric"><span class="metric-lbl">Status</span><span class="metric-val" style="color:var(--red)">${t('status.stopped')}</span></div></div>` : ''}
+                </div>` : !busy ? `<div class="svc-metrics"><div class="metric"><span class="metric-lbl">${t('table.status')}</span><span class="metric-val" style="color:var(--red)">${t('status.stopped')}</span></div></div>` : ''}
             </div>
         </a>
         <div class="svc-foot">
@@ -206,9 +206,17 @@ function buildCardHtml(svc) {
         </div>`;
 }
 
+// HomeBase's own containers — managed from Settings, not shown on dashboard
+const HOMEBASE_CONTAINERS = new Set(['homebase-api', 'homebase-db']);
+
+// Translate DB category names via i18n
+const CAT_I18N_MAP = { 'Media':'cat.media','Development':'cat.development','Monitoring':'cat.monitoring','Productivity':'cat.productivity','Security':'cat.security','AI/ML':'cat.ai_ml','Storage':'cat.storage','Networking':'cat.networking' };
+function tCat(name) { return CAT_I18N_MAP[name] ? t(CAT_I18N_MAP[name]) : name; }
+
 function renderServices() {
     const g = $('#servicesGrid');
     const filtered = services.filter(svc => {
+        if (HOMEBASE_CONTAINERS.has(svc.containerName)) return false;
         return !searchQuery || svc.name.toLowerCase().includes(searchQuery) || (svc.description||'').toLowerCase().includes(searchQuery);
     });
 

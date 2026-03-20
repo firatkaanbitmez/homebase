@@ -174,7 +174,8 @@ public class OnboardingController : ControllerBase
 
                 if (!needsDb && !string.IsNullOrEmpty(request.BuildContext))
                 {
-                    var appSettingsPath = Path.Combine(ProjectDir, request.BuildContext, "appsettings.json");
+                    var buildDir = Path.IsPathRooted(request.BuildContext) ? request.BuildContext : Path.Combine(ProjectDir, request.BuildContext);
+                    var appSettingsPath = Path.Combine(buildDir, "appsettings.json");
                     if (System.IO.File.Exists(appSettingsPath))
                     {
                         var appSettings = await System.IO.File.ReadAllTextAsync(appSettingsPath);
@@ -204,8 +205,8 @@ public class OnboardingController : ControllerBase
             {
                 Name = request.Name,
                 Description = request.Description ?? $"Deployed from {request.Image ?? request.BuildContext}",
-                Icon = $"/icons/{composeName}.png",
-                Color = ServiceManagementService.GenerateColor(composeName),
+                Icon = !string.IsNullOrWhiteSpace(request.Icon) ? request.Icon : $"/icons/{composeName}.png",
+                Color = !string.IsNullOrWhiteSpace(request.Color) ? request.Color : ServiceManagementService.GenerateColor(composeName),
                 ContainerName = slug,
                 ServiceSlug = slug,
                 ComposeFilePath = _composeFile.GetRelativeComposeFilePath(slug),
@@ -262,9 +263,10 @@ public class OnboardingController : ControllerBase
             var hubRef = _hub;
             _ = Task.Run(async () =>
             {
-                try { await hubRef.Clients.All.SendAsync("DeployProgress", new { slug = capturedSlug, status = "deploying", message = "Pulling image and starting container..." }); } catch { }
+                try { await hubRef.Clients.All.SendAsync("DeployProgress", new { slug = capturedSlug, status = "deploying", step = "build", message = "Pulling image and starting container..." }); } catch { }
 
                 var (ok, err) = _docker.RunShell($"docker compose -f \"{composePath}\" up -d", 300000);
+
                 try
                 {
                     using var bgScope = scopeFactory.CreateScope();
@@ -281,14 +283,16 @@ public class OnboardingController : ControllerBase
                 if (!ok)
                 {
                     _logger.LogError("Background deploy failed for {Service}: {Error}", capturedSlug, err);
-                    try { await hubRef.Clients.All.SendAsync("DeployProgress", new { slug = capturedSlug, status = "failed", message = err ?? "Deploy failed" }); } catch { }
+                    try { await hubRef.Clients.All.SendAsync("DeployProgress", new { slug = capturedSlug, status = "failed", step = "build", message = err ?? "Deploy failed" }); } catch { }
                 }
                 else
                 {
-                    _logger.LogInformation("Background deploy completed for {Service}", capturedSlug);
+                    // docker compose up -d succeeded — container is starting, NOT necessarily healthy
+                    // Send "start" step, NOT "ready" — let the frontend monitoring determine actual health
+                    _logger.LogInformation("Background deploy started for {Service}", capturedSlug);
                     try
                     {
-                        await hubRef.Clients.All.SendAsync("DeployProgress", new { slug = capturedSlug, status = "ready", message = "Service deployed successfully" });
+                        await hubRef.Clients.All.SendAsync("DeployProgress", new { slug = capturedSlug, status = "deploying", step = "start", message = "Container starting..." });
                         await _docker.NotifyCacheRefreshAsync();
                     }
                     catch { }

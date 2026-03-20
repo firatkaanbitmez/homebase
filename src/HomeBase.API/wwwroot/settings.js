@@ -16,11 +16,15 @@ async function loadEnv() {
 
 const systemSections = new Set(['General', 'Dashboard', 'AI Configuration']);
 
+// Translate DB section names
+const SECTION_I18N = { 'AI Configuration':'settings.aiConfig','General':'settings.general','Dashboard':'nav.dashboard' };
+function tSection(name) { return SECTION_I18N[name] ? t(SECTION_I18N[name]) : name; }
+
 function updatePollInterval(val) {
     pollInterval = parseInt(val);
     localStorage.setItem('pollInterval', pollInterval);
     restartPolling();
-    showToast(`Polling interval: ${pollInterval / 1000}s`, 'success');
+    showToast(`${t('msg.pollingChanged')}: ${pollInterval / 1000}s`, 'success');
 }
 
 async function renderEnv() {
@@ -46,6 +50,49 @@ async function renderEnv() {
 
     let html = '';
 
+    // ── HomeBase Self-Management ──
+    if (!q) {
+        const hbContainers = containers.filter(c => c.name === 'homebase-api' || c.name === 'homebase-db');
+        if (hbContainers.length > 0) {
+            html += `<div class="settings-category">
+                <div class="settings-cat-header">
+                    <svg width="16" height="16" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M16 2L28 9v14l-12 7L4 23V9l12-7z"/><path d="M16 10l-6 4v6l6 4 6-4v-6l-6-4z"/></svg>
+                    HomeBase
+                    <span style="font-size:.6rem;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-m);margin-left:.5rem">${t('settings.hbSub')}</span>
+                </div>
+                <div class="env-section open" style="margin-bottom:.75rem">
+                    <div class="env-body" style="display:block;padding:.5rem">
+                        ${hbContainers.map(c => {
+                            const up = c.state === 'running';
+                            const cpu = c.stats?.cpu || '0';
+                            const mem = c.stats?.memMB || '0';
+                            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .6rem;border-radius:6px;margin-bottom:.3rem;background:var(--bg-3)">
+                                <div style="display:flex;align-items:center;gap:.6rem;flex:1;min-width:0">
+                                    <span class="dot ${c.state}"></span>
+                                    <div>
+                                        <div style="font-weight:600;font-size:.82rem">${escHtml(c.name)}</div>
+                                        <div style="font-size:.65rem;color:var(--text-m)">${escHtml(c.image)} · ${c.status}</div>
+                                    </div>
+                                </div>
+                                ${up ? `<div style="display:flex;align-items:center;gap:.6rem;font-size:.7rem;color:var(--text-d);margin:0 .8rem">
+                                    <span>CPU ${cpu}%</span><span>MEM ${mem}MB</span>
+                                </div>` : ''}
+                                <div style="display:flex;gap:.3rem">
+                                    ${up ? `<button class="svc-action-btn" onclick="restartContainer('${escHtml(c.name)}')" title="${t('confirm.restart')}">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                                    </button>` : ''}
+                                    ${up ? `<button class="svc-action-btn" onclick="openLogs('${escHtml(c.name)}')" title="${t('logs.title')}">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                    </button>` : ''}
+                                </div>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>
+            </div>`;
+        }
+    }
+
     // ── 3A: System Health Dashboard ──
     if (!q) {
         const run = containers.filter(c => c.state === 'running');
@@ -64,12 +111,12 @@ async function renderEnv() {
             </div>
             <div class="health-grid">
                 <div class="health-card">
-                    <div class="health-card-label">CPU</div>
+                    <div class="health-card-label">${t('health.cpu')}</div>
                     <div class="health-card-val" style="color:${getBarColor(cpuPct)}">${cpuPct.toFixed(1)}%</div>
                     <div class="health-bar"><div class="health-bar-fill" style="width:${cpuPct}%;background:${getBarColor(cpuPct)}"></div></div>
                 </div>
                 <div class="health-card">
-                    <div class="health-card-label">Memory</div>
+                    <div class="health-card-label">${t('health.memory')}</div>
                     <div class="health-card-val" style="color:${getBarColor(memPct)}">${memPct.toFixed(1)}%</div>
                     <div class="health-card-sub">${mem} MB ${t('settings.memUsed')}</div>
                     <div class="health-bar"><div class="health-bar-fill" style="width:${memPct}%;background:${getBarColor(memPct)}"></div></div>
@@ -77,20 +124,20 @@ async function renderEnv() {
                 ${(disksData || []).map(d => {
                     const dPct = d.percent || 0;
                     return `<div class="health-card">
-                        <div class="health-card-label">Disk — ${escHtml(d.name)}</div>
+                        <div class="health-card-label">${t('health.disk')} — ${escHtml(d.name)}</div>
                         <div class="health-card-val" style="color:${getBarColor(dPct)}">${dPct}%</div>
                         <div class="health-card-sub">${d.used}/${d.total} GB</div>
                         <div class="health-bar"><div class="health-bar-fill" style="width:${dPct}%;background:${getBarColor(dPct)}"></div></div>
                     </div>`;
                 }).join('')}
                 <div class="health-card">
-                    <div class="health-card-label">Network I/O</div>
+                    <div class="health-card-label">${t('health.networkIo')}</div>
                     <div class="health-card-val" style="font-size:.85rem">↓${fmtBytes(totalRx)} ↑${fmtBytes(totalTx)}</div>
                 </div>
                 ${gpuInfo?.available && gpuInfo.devices?.length ? gpuInfo.devices.map(gpu => {
                     const util = parseInt(gpu.utilizationGpu) || 0;
                     return `<div class="health-card">
-                        <div class="health-card-label">GPU ${gpu.index}</div>
+                        <div class="health-card-label">${t('health.gpu')} ${gpu.index}</div>
                         <div class="health-card-val" style="color:${getBarColor(util)}">${util}%</div>
                         <div class="health-card-sub">${gpu.temperatureC} · VRAM ${gpu.memoryUsed}/${gpu.memoryTotal}</div>
                         <div class="health-bar"><div class="health-bar-fill" style="width:${util}%;background:${getBarColor(util)}"></div></div>
@@ -130,7 +177,7 @@ async function renderEnv() {
                     </div>
                     <div class="env-row">
                         <span class="env-key">${t('settings.theme')}</span>
-                        <span style="color:var(--text-d);font-size:.78rem">${currentTheme === 'dark' ? 'Dark' : 'Light'}</span>
+                        <span style="color:var(--text-d);font-size:.78rem">${currentTheme === 'dark' ? t('theme.dark') : t('theme.light')}</span>
                     </div>
                     <div class="env-row">
                         <span class="env-key">${t('settings.activeContainers')}</span>
@@ -176,7 +223,7 @@ async function renderEnv() {
                             <span style="font-size:.7rem;color:var(--text-m)">${extCount} ${t('port.open')} / ${ports.length - extCount} ${t('port.closed')}</span>
                         </div>
                         ${ports.length > 0 ? `<table class="port-table" id="portTable">
-                            <thead><tr><th style="width:36px"></th><th>Port</th><th>Protocol</th><th>${t('port.service')}</th><th>${t('port.container')}</th><th>${t('port.access')}</th></tr></thead>
+                            <thead><tr><th style="width:36px"></th><th>${t('table.port')}</th><th>${t('table.protocol')}</th><th>${t('port.service')}</th><th>${t('port.container')}</th><th>${t('port.access')}</th></tr></thead>
                             <tbody>
                                 ${ports.map(p => `<tr data-port="${p.port}" data-service="${escHtml(p.serviceName||'')}">
                                     <td><span class="dot" style="width:8px;height:8px;border-radius:50%;display:inline-block;background:${p.isExternal ? 'var(--green)' : 'var(--text-m)'}"></span></td>
@@ -362,14 +409,58 @@ function buildEnvSection(sec, si) {
             <span class="env-section-title">
                 <svg class="chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
                 ${iconHtml}
-                ${sec.name}
+                ${tSection(sec.name)}
                 <span class="env-var-count">${varCount}</span>
                 ${envTarget}
             </span>
         </div>
         <div class="env-body">
-            ${sec.vars.map(v => `
-            <div class="env-row">
+            ${sec.vars.map(v => {
+                // AI_ENABLED: toggle switch
+                if (v.key === 'AI_ENABLED') {
+                    const isOn = v.value?.toLowerCase() === 'true';
+                    return `<div class="env-row">
+                        <span class="env-key">${v.key}${v.description ? `<span class="env-description">${escHtml(v.description)}</span>` : ''}</span>
+                        <div style="display:flex;align-items:center;gap:.5rem">
+                            <button type="button" class="toggle ${isOn ? 'on' : ''}" style="flex-shrink:0"
+                                onclick="this.classList.toggle('on');const inp=this.parentElement.querySelector('.env-val');inp.value=this.classList.contains('on')?'true':'false';inp.dispatchEvent(new Event('input'))"></button>
+                            <input class="env-val" type="hidden" data-key="${v.key}" data-si="${si}" data-orig="${escHtml(v.value)}" value="${escHtml(v.value)}" oninput="markChanged(${si})">
+                            <span style="font-size:.75rem;color:var(--text-d)">${isOn ? t('settings.on') : t('settings.off')}</span>
+                        </div>
+                    </div>`;
+                }
+                // AI_PROVIDER: select dropdown
+                if (v.key === 'AI_PROVIDER') {
+                    const providers = [{v:'openai',l:t('ai.providerOpenai')},{v:'gemini',l:t('ai.providerGemini')},{v:'claude',l:t('ai.providerClaude')},{v:'custom',l:t('ai.providerCustom')}];
+                    return `<div class="env-row">
+                        <span class="env-key">${v.key}${v.description ? `<span class="env-description">${escHtml(v.description)}</span>` : ''}</span>
+                        <select class="env-val" data-key="${v.key}" data-si="${si}" data-orig="${escHtml(v.value)}"
+                            style="background:var(--bg-4);border:1px solid var(--border);border-radius:6px;padding:.3rem .5rem;font-size:.75rem;color:var(--text);font-family:inherit;outline:none"
+                            oninput="markChanged(${si});toggleBaseUrlVisibility(this.closest('.env-body'))">
+                            ${providers.map(p => `<option value="${p.v}" ${v.value === p.v ? 'selected' : ''}>${p.l}</option>`).join('')}
+                        </select>
+                    </div>`;
+                }
+                // AI_BASE_URL: show only when custom
+                if (v.key === 'AI_BASE_URL') {
+                    const providerVar = sec.vars.find(vv => vv.key === 'AI_PROVIDER');
+                    const isCustom = providerVar?.value === 'custom';
+                    return `<div class="env-row ai-base-url-row" style="${isCustom ? '' : 'display:none'}">
+                        <span class="env-key">${v.key}${v.description ? `<span class="env-description">${escHtml(v.description)}</span>` : ''}</span>
+                        <input class="env-val" type="text" data-key="${v.key}" data-si="${si}" data-orig="${escHtml(v.value)}" value="${escHtml(v.value)}" oninput="markChanged(${si})" placeholder="https://api.example.com/v1/chat/completions">
+                    </div>`;
+                }
+                // AI_MODEL: with provider-specific placeholder
+                if (v.key === 'AI_MODEL') {
+                    const providerVar = sec.vars.find(vv => vv.key === 'AI_PROVIDER');
+                    const prov = providerVar?.value || 'openai';
+                    const placeholder = prov === 'gemini' ? 'gemini-2.5-flash' : prov === 'claude' ? 'claude-sonnet-4-20250514' : prov === 'openai' ? 'gpt-4.1-mini' : 'model-name';
+                    return `<div class="env-row">
+                        <span class="env-key">${v.key}${v.description ? `<span class="env-description">${escHtml(v.description)}</span>` : ''}</span>
+                        <input class="env-val" type="text" data-key="${v.key}" data-si="${si}" data-orig="${escHtml(v.value)}" value="${escHtml(v.value)}" oninput="markChanged(${si})" placeholder="${placeholder}">
+                    </div>`;
+                }
+                return `<div class="env-row">
                 <span class="env-key">${v.key}${v.isPort ? '<span class="env-port-badge">PORT</span>' : ''}${v.description ? `<span class="env-description">${escHtml(v.description)}</span>` : ''}</span>
                 <input class="env-val" type="${isSecretKey(v.key) ? 'password' : 'text'}"
                     data-key="${v.key}" data-si="${si}" data-orig="${escHtml(v.value)}"
@@ -377,7 +468,8 @@ function buildEnvSection(sec, si) {
                     oninput="markChanged(${si})"
                     onfocus="if(this.type==='password')this.type='text'"
                     onblur="if(this.dataset.key.toLowerCase().includes('password')||this.dataset.key.toLowerCase().includes('secret'))this.type='password'">
-            </div>`).join('')}
+            </div>`;
+            }).join('')}
             <div class="env-actions" id="actions-${si}">
                 <button class="env-apply-btn" onclick="applySection(${si},'${composeSvc}',${svcId || 'null'})">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
@@ -387,6 +479,15 @@ function buildEnvSection(sec, si) {
             </div>
         </div>
     </div>`;
+}
+
+function toggleBaseUrlVisibility(envBody) {
+    if (!envBody) return;
+    const providerSelect = envBody.querySelector('[data-key="AI_PROVIDER"]');
+    const baseUrlRow = envBody.querySelector('.ai-base-url-row');
+    if (providerSelect && baseUrlRow) {
+        baseUrlRow.style.display = providerSelect.value === 'custom' ? '' : 'none';
+    }
 }
 
 function markChanged(si) {

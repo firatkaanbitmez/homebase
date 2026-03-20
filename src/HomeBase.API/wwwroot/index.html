@@ -1,21 +1,22 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HomeBase</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⬡</text></svg>">
-    <link rel="stylesheet" href="style.css?v=10">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'><defs><linearGradient id='g' x1='0' y1='0' x2='32' y2='32' gradientUnits='userSpaceOnUse'><stop stop-color='%236366f1'/><stop offset='1' stop-color='%23a78bfa'/></linearGradient></defs><path d='M16 2L28 9v14l-12 7L4 23V9l12-7z' stroke='url(%23g)' stroke-width='1.5' fill='none'/><path d='M16 10l-6 4v6l6 4 6-4v-6l-6-4z' stroke='url(%23g)' stroke-width='1.5' fill='none'/><path d='M10 14l6 4 6-4M16 18v6' stroke='url(%23g)' stroke-width='1.5'/></svg>">
+    <link rel="stylesheet" href="style.css?v=14">
 </head>
 <body>
     <div class="app">
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
-                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="url(#lg)" stroke-width="2">
-                        <defs><linearGradient id="lg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient></defs>
-                        <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/>
-                        <line x1="12" y1="22" x2="12" y2="15.5"/><line x1="22" y1="8.5" x2="12" y2="15.5"/><line x1="2" y1="8.5" x2="12" y2="15.5"/>
+                    <svg width="26" height="26" viewBox="0 0 32 32" fill="none">
+                        <defs><linearGradient id="lg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse"><stop stop-color="#6366f1"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs>
+                        <path d="M16 2L28 9v14l-12 7L4 23V9l12-7z" stroke="url(#lg)" stroke-width="1.5"/>
+                        <path d="M16 10l-6 4v6l6 4 6-4v-6l-6-4z" stroke="url(#lg)" stroke-width="1.5"/>
+                        <path d="M10 14l6 4 6-4M16 18v6" stroke="url(#lg)" stroke-width="1.5"/>
                     </svg>
                     <span class="logo-text">HomeBase</span>
                 </div>
@@ -33,7 +34,7 @@
                 </a>
                 <a class="nav-link" data-view="auditlog">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                    <span data-i18n="nav.auditlog">Kayıt Geçmişi</span>
+                    <span data-i18n="nav.auditlog">Audit Log</span>
                 </a>
                 <a class="nav-link" data-view="settings">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
@@ -59,10 +60,10 @@
                 <button class="hamburger" id="hamburger">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
                 </button>
-                <h1 id="pageTitle">Dashboard</h1>
+                <h1 id="pageTitle" data-i18n="nav.dashboard">Dashboard</h1>
                 <div class="topbar-right">
-                    <button class="lang-toggle" id="langToggle" onclick="setLang(currentLang==='tr'?'en':'tr')">TR</button>
-                    <button class="theme-toggle" id="themeToggle" data-i18n-title="topbar.theme" title="Tema Değiştir">
+                    <button class="lang-toggle" id="langToggle" onclick="setLang(currentLang==='tr'?'en':'tr')">EN</button>
+                    <button class="theme-toggle" id="themeToggle" data-i18n-title="topbar.theme" title="Toggle Theme">
                         <svg id="themeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
                     </button>
                     <div class="live-pill" id="livePill"><span class="live-dot"></span><span id="liveLabel">LIVE</span></div>
@@ -75,23 +76,22 @@
                 <div class="stats-row" id="statsRow">
                     <div class="stat-card" data-chart="cpu">
                         <div class="stat-icon si-cpu"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></div>
-                        <div class="stat-body"><span class="stat-lbl">CPU</span><span class="stat-val" id="totalCpu">--%</span></div>
+                        <div class="stat-body"><span class="stat-lbl" data-i18n="stat.cpu">CPU</span><span class="stat-val" id="totalCpu">--%</span></div>
                         <div class="mini-chart" id="cpuChart"></div>
                     </div>
                     <div class="stat-card" data-chart="mem">
                         <div class="stat-icon si-mem"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="10" y1="10" x2="10" y2="14"/><line x1="14" y1="10" x2="14" y2="14"/><line x1="18" y1="10" x2="18" y2="14"/></svg></div>
-                        <div class="stat-body"><span class="stat-lbl">Memory</span><span class="stat-val" id="totalMem">-- MB</span></div>
+                        <div class="stat-body"><span class="stat-lbl" data-i18n="stat.memory">Memory</span><span class="stat-val" id="totalMem">-- MB</span></div>
                         <div class="mini-chart" id="memChart"></div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon si-ctr"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg></div>
-                        <div class="stat-body"><span class="stat-lbl">Containers</span><span class="stat-val"><span id="runCount">-</span><small class="txt-green"> running</small> / <span id="stopCount">-</span><small class="txt-muted"> total</small></span></div>
+                        <div class="stat-body"><span class="stat-lbl" data-i18n="stat.containers">Containers</span><span class="stat-val"><span id="runCount">-</span><small class="txt-green" data-i18n="stat.running"> running</small> / <span id="stopCount">-</span><small class="txt-muted" data-i18n="stat.total"> total</small></span></div>
                     </div>
                 </div>
 
                 <div class="section-bar">
-                    <h2>Services</h2>
-                    <!-- Services header not i18n'd — "Services" is universal -->
+                    <h2 data-i18n="section.services">Services</h2>
                     <div class="search-box">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                         <input type="text" id="searchInput" data-i18n-placeholder="search.placeholder" placeholder="Search services..." autocomplete="off">
@@ -99,7 +99,7 @@
 
                     <button class="section-btn primary" onclick="openOnboardingWizard()" title="Add Service (N)">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                        <span data-i18n="misc.addService">Servis Ekle</span>
+                        <span data-i18n="misc.addService">Add Service</span>
                     </button>
                     <div class="view-toggle" id="viewToggle">
                         <button class="vt-btn active" data-mode="grid" title="Card View">
@@ -118,7 +118,7 @@
                 <div class="section-bar"><h2 data-i18n="containers.title">All Containers</h2></div>
                 <div class="tbl-wrap">
                     <table class="tbl">
-                        <thead><tr><th style="width:28px"></th><th>Status</th><th>Name</th><th>Image</th><th>State</th><th>CPU</th><th>Memory</th><th>Ports</th><th>Actions</th></tr></thead>
+                        <thead><tr><th style="width:28px"></th><th data-i18n="table.status">Status</th><th data-i18n="table.name">Name</th><th data-i18n="table.image">Image</th><th data-i18n="table.state">State</th><th data-i18n="table.cpu">CPU</th><th data-i18n="table.memory">Memory</th><th data-i18n="table.ports">Ports</th><th data-i18n="table.actions">Actions</th></tr></thead>
                         <tbody id="containersBody"></tbody>
                     </table>
                 </div>
@@ -126,10 +126,10 @@
 
             <!-- Audit Log -->
             <section id="auditlogView" class="view">
-                <div class="section-bar"><h2 data-i18n="audit.title">Kayıt Geçmişi</h2></div>
+                <div class="section-bar"><h2 data-i18n="audit.title">Audit Log</h2></div>
                 <div class="audit-filters">
                     <select id="auditAction">
-                        <option value="" data-i18n="audit.allActions">Tüm İşlemler</option>
+                        <option value="" data-i18n="audit.allActions">All Actions</option>
                         <option value="start">Start</option>
                         <option value="stop">Stop</option>
                         <option value="restart">Restart</option>
@@ -141,16 +141,16 @@
                         <option value="service_auto_discover">Auto Discover</option>
                         <option value="setting_change">Setting Change</option>
                     </select>
-                    <input type="date" id="auditFrom" title="Başlangıç tarihi">
-                    <input type="date" id="auditTo" title="Bitiş tarihi">
+                    <input type="date" id="auditFrom" data-i18n-title="audit.fromDate" title="Start date">
+                    <input type="date" id="auditTo" data-i18n-title="audit.toDate" title="End date">
                     <div class="search-box" style="margin:0;max-width:220px">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                        <input type="text" id="auditSearch" placeholder="Ara..." autocomplete="off">
+                        <input type="text" id="auditSearch" data-i18n-placeholder="audit.search" placeholder="Search..." autocomplete="off">
                     </div>
                 </div>
                 <div class="tbl-wrap" id="auditTableWrap">
                     <table class="tbl">
-                        <thead><tr><th data-i18n="audit.time">Zaman</th><th data-i18n="audit.action">İşlem</th><th data-i18n="audit.target">Hedef</th><th data-i18n="audit.detail">Detay</th></tr></thead>
+                        <thead><tr><th data-i18n="audit.time">Time</th><th data-i18n="audit.action">Action</th><th data-i18n="audit.target">Target</th><th data-i18n="audit.detail">Detail</th></tr></thead>
                         <tbody id="auditBody"></tbody>
                     </table>
                 </div>
@@ -159,11 +159,11 @@
 
             <!-- Settings -->
             <section id="settingsView" class="view">
-                <div class="section-bar"><h2 data-i18n="settings.title">HomeBase Ayarları</h2></div>
+                <div class="section-bar"><h2 data-i18n="settings.title">HomeBase Settings</h2></div>
                 <div class="settings-search-wrap" style="display:flex;align-items:center;gap:.5rem">
                     <div class="search-box settings-search" style="flex:1">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                        <input type="text" id="settingsSearchInput" data-i18n-placeholder="settings.searchPlaceholder" placeholder="Ayar ara..." autocomplete="off">
+                        <input type="text" id="settingsSearchInput" data-i18n-placeholder="settings.searchPlaceholder" placeholder="Search settings..." autocomplete="off">
                     </div>
                 </div>
                 <div id="envSections"></div>
@@ -179,11 +179,12 @@
         <div class="logs-toolbar">
             <h3 id="logsPanelTitle" data-i18n="logs.title">Container Logs</h3>
             <select id="logsLines">
-                <option value="100">100 lines</option>
-                <option value="200" selected>200 lines</option>
-                <option value="500">500 lines</option>
-                <option value="1000">1000 lines</option>
+                <option value="100">100</option>
+                <option value="200" selected>200</option>
+                <option value="500">500</option>
+                <option value="1000">1000</option>
             </select>
+            <span style="font-size:.65rem;color:var(--text-m)" data-i18n="logs.lines">lines</span>
             <label class="logs-auto-label">
                 <input type="checkbox" id="logsAutoScroll" checked> <span data-i18n="logs.autoScroll">Auto-scroll</span>
             </label>
@@ -197,18 +198,38 @@
         <div class="logs-body" id="logsBody">Loading logs...</div>
     </div>
 
+    <!-- Deploy Panel -->
+    <div class="deploy-panel" id="deployPanel">
+        <div class="deploy-panel-toolbar">
+            <h3 id="deployPanelTitle">Deploy</h3>
+            <span class="deploy-panel-timer" id="deployTimer"></span>
+            <button class="logs-close" id="deployPanelClose" onclick="closeDeployPanel()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="deploy-panel-body" id="deployPanelBody"></div>
+        <div class="deploy-chat" id="deployChat" style="display:none">
+            <div class="deploy-chat-messages" id="deployChatMessages"></div>
+            <div class="deploy-chat-input-row">
+                <input type="text" class="deploy-chat-input" id="deployChatInput" placeholder="" autocomplete="off"
+                    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendDeployChat();}">
+                <button class="deploy-chat-send" id="deployChatSend" onclick="sendDeployChat()">→</button>
+            </div>
+        </div>
+    </div>
+
     <div id="modalRoot"></div>
     <script src="lib/signalr.min.js"></script>
-    <script src="utils.js?v=11"></script>
-    <script src="i18n.js?v=11"></script>
-    <script src="ui.js?v=11"></script>
-    <script src="state.js?v=11"></script>
-    <script src="render.js?v=11"></script>
-    <script src="containers.js?v=11"></script>
-    <script src="settings.js?v=11"></script>
-    <script src="wizard.js?v=11"></script>
-    <script src="editor.js?v=11"></script>
-    <script src="audit.js?v=11"></script>
-    <script src="app.js?v=11"></script>
+    <script src="utils.js?v=14"></script>
+    <script src="i18n.js?v=14"></script>
+    <script src="ui.js?v=14"></script>
+    <script src="state.js?v=14"></script>
+    <script src="render.js?v=14"></script>
+    <script src="containers.js?v=14"></script>
+    <script src="settings.js?v=14"></script>
+    <script src="wizard.js?v=14"></script>
+    <script src="editor.js?v=14"></script>
+    <script src="audit.js?v=14"></script>
+    <script src="app.js?v=14"></script>
 </body>
 </html>

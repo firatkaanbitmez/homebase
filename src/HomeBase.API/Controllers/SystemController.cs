@@ -1,4 +1,5 @@
 using HomeBase.API.Data;
+using HomeBase.API.Models;
 using HomeBase.API.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -70,10 +71,39 @@ public class SystemController : ControllerBase
         var webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "icons");
         if (!Directory.Exists(webRoot)) return Ok(Array.Empty<string>());
         var icons = Directory.GetFiles(webRoot)
-            .Where(f => new[] { ".png", ".svg", ".ico", ".jpg" }
+            .Where(f => new[] { ".png", ".svg", ".ico", ".jpg", ".webp" }
                 .Contains(Path.GetExtension(f).ToLower()))
             .Select(f => "/icons/" + Path.GetFileName(f))
             .OrderBy(f => f).ToList();
         return Ok(icons);
+    }
+
+    [HttpPost("icons/upload")]
+    public async Task<IActionResult> UploadIcon(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(new ApiError("NO_FILE", "No file provided"));
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var allowed = new[] { ".png", ".svg", ".ico", ".jpg", ".webp" };
+        if (!allowed.Contains(ext))
+            return BadRequest(new ApiError("INVALID_TYPE", $"Allowed types: {string.Join(", ", allowed)}"));
+
+        if (file.Length > 512 * 1024)
+            return BadRequest(new ApiError("TOO_LARGE", "Max file size is 512KB"));
+
+        var webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "icons");
+        Directory.CreateDirectory(webRoot);
+
+        // Sanitize filename
+        var safeName = System.Text.RegularExpressions.Regex.Replace(
+            Path.GetFileNameWithoutExtension(file.FileName).ToLowerInvariant(),
+            @"[^a-z0-9_-]", "-") + ext;
+
+        var filePath = Path.Combine(webRoot, safeName);
+        await using var stream = new FileStream(filePath, FileMode.Create);
+        await file.CopyToAsync(stream);
+
+        return Ok(new { url = $"/icons/{safeName}" });
     }
 }
