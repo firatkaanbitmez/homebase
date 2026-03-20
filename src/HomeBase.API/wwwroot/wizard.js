@@ -3,7 +3,7 @@
 // ─── Deploy Panel State (Card-based) ───
 let activeDeploy = null;
 
-function openDeployPanel(slug, name) {
+function openDeployPanel(slug, name, source) {
     if (activeDeploy) {
         if (activeDeploy.timerInterval) clearInterval(activeDeploy.timerInterval);
         activeDeploy.monitorAbort = true;
@@ -11,10 +11,12 @@ function openDeployPanel(slug, name) {
 
     activeDeploy = {
         slug, name,
+        source: source || 'manual', // 'dockerhub' | 'catalog' | 'ai' | 'manual'
         startTime: Date.now(),
         timerInterval: null,
         done: false,
         monitorAbort: false,
+        aiAvailable: null, // cached AI status, checked on first failure
         attempts: [
             { id: 1, status: 'deploying', startTime: Date.now(), endTime: null, reasoning: null, fixDescription: null, userAction: null, logs: null, collapsed: false }
         ],
@@ -119,14 +121,24 @@ function renderDeployPanel() {
         </div>`;
     }).join('');
 
-    // Final card if max attempts reached
+    // Final card: non-AI failed deploy shows logs + action buttons; AI max attempts shows manual required
     let finalHtml = '';
-    if (activeDeploy.done && activeDeploy.attempts.length >= activeDeploy.maxAttempts) {
-        const lastAtt = currentAttempt();
-        if (lastAtt && lastAtt.status === 'failed') {
+    const lastAtt = currentAttempt();
+    if (activeDeploy.done && lastAtt && lastAtt.status === 'failed') {
+        if (activeDeploy.source !== 'ai' || activeDeploy.attempts.length >= activeDeploy.maxAttempts) {
+            const isNonAi = activeDeploy.source !== 'ai';
+            let actionButtons = '';
+            if (isNonAi) {
+                actionButtons += `<button class="section-btn" onclick="refreshDeployLogs()" style="margin-right:.4rem">${t('deploy.refreshLogs')}</button>`;
+                actionButtons += `<button class="section-btn" onclick="restartFromDeployPanel()" style="margin-right:.4rem">${t('deploy.restartContainer')}</button>`;
+                if (activeDeploy.aiAvailable) {
+                    actionButtons += `<button class="section-btn primary" onclick="triggerAiDiagnoseFromPanel()">${t('deploy.aiDiagnose')}</button>`;
+                }
+            }
             finalHtml = `<div class="deploy-final-card">
-                <div class="deploy-final-card-title">${t('deploy.manualRequired')}</div>
-                <div class="deploy-final-card-body">${lastAtt.userAction ? escHtml(lastAtt.userAction) : t('deploy.triedNFixes').replace('{n}', activeDeploy.maxAttempts)}</div>
+                <div class="deploy-final-card-title">${isNonAi ? t('deploy.manualFixNeeded') : t('deploy.manualRequired')}</div>
+                <div class="deploy-final-card-body">${lastAtt.userAction ? escHtml(lastAtt.userAction) : (isNonAi ? '' : t('deploy.triedNFixes').replace('{n}', activeDeploy.maxAttempts))}</div>
+                ${actionButtons ? `<div style="margin-top:.6rem;display:flex;flex-wrap:wrap;gap:.3rem">${actionButtons}</div>` : ''}
             </div>`;
         }
     }
@@ -137,12 +149,13 @@ function renderDeployPanel() {
 
     body.innerHTML = `<div class="deploy-attempts">${attemptsHtml}</div>${finalHtml}${dismissHtml}`;
 
-    // Show chat when there's an error or deploy is done
+    // Show chat only when AI is available (always for AI source, optionally for others)
     const chatEl = document.getElementById('deployChat');
     const chatInput = document.getElementById('deployChatInput');
     if (chatEl) {
         const hasError = activeDeploy.attempts.some(a => a.status === 'failed');
-        chatEl.style.display = (hasError || activeDeploy.done) ? 'block' : 'none';
+        const showChat = (hasError || activeDeploy.done) && (activeDeploy.source === 'ai' || activeDeploy.aiAvailable === true);
+        chatEl.style.display = showChat ? 'block' : 'none';
         if (chatInput && !chatInput.placeholder) chatInput.placeholder = t('deploy.chatPlaceholder');
     }
 }
@@ -403,7 +416,7 @@ async function openOnboardingWizard() {
                 </div>
                 <div class="wizard-nav">
                     <button class="section-btn" onclick="goToPhase1()">← ${t('wizard.back')}</button>
-                    <button class="section-btn primary" id="cfgDeployBtn" onclick="doUnifiedDeploy()">Deploy →</button>
+                    <button class="section-btn primary" id="cfgDeployBtn" onclick="doUnifiedDeploy()">${t('misc.deployBtn')}</button>
                 </div>
             </div>
         </div>`;
@@ -573,7 +586,7 @@ function goToPhase2(data) {
     overlay.querySelector('#cfgDeployProgress').style.display = 'none';
     const btn = overlay.querySelector('#cfgDeployBtn');
     btn.disabled = false;
-    btn.textContent = 'Deploy →';
+    btn.textContent = t('misc.deployBtn');
 
     updateUnifiedPreview();
 }
@@ -752,18 +765,18 @@ async function doUnifiedDeploy() {
             const slug = data.containerName || name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
             // Close wizard modal, open deploy panel
             if (close) close();
-            openDeployPanel(slug, name);
+            openDeployPanel(slug, name, wizardState.source || 'manual');
             // Start monitoring in the panel
             monitorDeployHealth(slug, name);
         } else {
             showToast(`${t('msg.deployFail')}: ` + (data.error || ''), 'error');
             btn.disabled = false;
-            btn.textContent = 'Deploy →';
+            btn.textContent = t('misc.deployBtn');
         }
     } catch (err) {
         showToast(`${t('msg.deployFail')}: ` + err.message, 'error');
         btn.disabled = false;
-        btn.textContent = 'Deploy →';
+        btn.textContent = t('misc.deployBtn');
     }
 }
 
@@ -923,11 +936,53 @@ async function autoDetectUrlPath(slug, port) {
     } catch {}
 }
 
+async function checkAiAvailable() {
+    if (activeDeploy && activeDeploy.aiAvailable !== null) return activeDeploy.aiAvailable;
+    try {
+        const res = await fetch('/api/Ai/status');
+        const status = await res.json();
+        const available = !!(status.enabled && status.hasApiKey);
+        if (activeDeploy) activeDeploy.aiAvailable = available;
+        return available;
+    } catch { return false; }
+}
+
+async function fetchContainerLogs(slug) {
+    try {
+        const res = await fetch(`/api/Containers/${encodeURIComponent(slug)}/logs?lines=50`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return typeof data === 'string' ? data : (data.logs || data.output || JSON.stringify(data));
+    } catch { return null; }
+}
+
 async function runDeployDiagnosis(slug, name) {
     if (!activeDeploy || activeDeploy.slug !== slug) return;
 
     const att = currentAttempt();
     if (!att) return;
+
+    const isAiSource = activeDeploy.source === 'ai';
+
+    // Non-AI sources: show logs and optional AI button instead of auto-calling AI
+    if (!isAiSource) {
+        att.status = 'failed';
+        att.endTime = Date.now();
+
+        // Fetch container logs to show the user
+        const logs = await fetchContainerLogs(slug);
+        att.logs = logs || t('deploy.noLogs');
+        att.userAction = t('deploy.manualFixNeeded');
+
+        // Check AI availability for optional diagnose button
+        const aiAvail = await checkAiAvailable();
+        activeDeploy.done = true;
+        stopDeployTimer();
+        renderDeployPanel();
+        return;
+    }
+
+    // ─── AI source: existing AI fix flow ───
 
     // Attach result logs to the previous attempt so AI knows what happened after its fix
     if (activeDeploy.previousAttempts.length > 0) {
@@ -1007,6 +1062,51 @@ async function runDeployDiagnosis(slug, name) {
         att.reasoning = `${t('wizard.deployMonitor.diagFail')}: ${err.message}`;
         stopDeployTimer();
         renderDeployPanel();
+    }
+}
+
+// Trigger AI diagnosis from non-AI deploy (optional button)
+async function triggerAiDiagnoseFromPanel() {
+    if (!activeDeploy) return;
+    // Switch to AI flow for this deploy
+    activeDeploy.source = 'ai';
+    activeDeploy.done = false;
+    activeDeploy.aiAvailable = true;
+
+    const att = currentAttempt();
+    if (att) {
+        att.status = 'diagnosing';
+        att.endTime = null;
+        att.userAction = null;
+    }
+    renderDeployPanel();
+
+    // Run AI diagnosis
+    await runDeployDiagnosis(activeDeploy.slug, activeDeploy.name);
+    fetchAll();
+}
+
+// Refresh container logs in deploy panel
+async function refreshDeployLogs() {
+    if (!activeDeploy) return;
+    const att = currentAttempt();
+    if (!att) return;
+    const logs = await fetchContainerLogs(activeDeploy.slug);
+    att.logs = logs || t('deploy.noLogs');
+    renderDeployPanel();
+}
+
+// Restart container from deploy panel
+async function restartFromDeployPanel() {
+    if (!activeDeploy) return;
+    try {
+        await fetch(`/api/Containers/${encodeURIComponent(activeDeploy.slug)}/restart`, { method: 'POST' });
+        showToast(`${activeDeploy.name} ${t('confirm.restart')}`, 'info');
+        // Reset and re-monitor
+        activeDeploy.done = false;
+        startNewDeployRound();
+    } catch (err) {
+        showToast(`${t('msg.restartFail')}: ${err.message}`, 'error');
     }
 }
 
@@ -1324,7 +1424,7 @@ async function searchDockerHub(query, overlay) {
                 <div class="dh-item-body">
                     <div class="dh-item-name">
                         ${escHtml(r.name)}
-                        ${r.isOfficial ? '<span class="dh-official">Official</span>' : ''}
+                        ${r.isOfficial ? `<span class="dh-official">${t('misc.official')}</span>` : ''}
                     </div>
                     <div class="dh-item-desc">${escHtml(r.description)}</div>
                     <div class="dh-item-meta">
@@ -1349,7 +1449,7 @@ function renderCatalogItems(items) {
         const logoHtml = item.logoUrl
             ? `<img class="catalog-item-logo" src="${escHtml(item.logoUrl)}" alt="" onerror="this.style.display='none'">`
             : '';
-        const officialBadge = item.isOfficial ? '<span class="dh-official">Official</span>' : '';
+        const officialBadge = item.isOfficial ? `<span class="dh-official">${t('misc.official')}</span>` : '';
         const metaHtml = (stars > 0 || pulls > 0)
             ? `<div class="catalog-item-meta"><span>⭐ ${stars.toLocaleString()}</span><span>📥 ${fmtPullCount(pulls)}</span></div>`
             : '';

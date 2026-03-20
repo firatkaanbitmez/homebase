@@ -60,6 +60,7 @@ const LANG = {
     'settings.composeTimeout':'Compose Zaman Aşımı','settings.stopTimeout':'Durdurma Süresi',
     'settings.chartHistory':'Grafik Geçmişi','settings.gpuPolling':'GPU Yenileme',
     'settings.docker':'Docker',
+    'misc.deployBtn':'Deploy →','misc.official':'Resmi','misc.localAccess':'Yerel erişim (proxy)',
     // Port Toggle
     'port.all':'Herkese Açık','port.local':'Yerel',
     // Wizard
@@ -235,6 +236,12 @@ const LANG = {
     'deploy.userAction':'Manuel müdahale gerekli',
     'deploy.triedNFixes':'AI {n} düzeltme denedi',
     'deploy.manualRequired':'Manuel müdahale gerekli',
+    'deploy.containerLogs':'Container Günlükleri',
+    'deploy.refreshLogs':'Logları Yenile',
+    'deploy.restartContainer':'Yeniden Başlat',
+    'deploy.aiDiagnose':'AI ile Teşhis Et',
+    'deploy.manualFixNeeded':'Deploy başarısız oldu. Logları kontrol edin.',
+    'deploy.noLogs':'Log bulunamadı',
   },
   en: {
     // Nav/Header
@@ -296,6 +303,7 @@ const LANG = {
     'settings.composeTimeout':'Compose Timeout','settings.stopTimeout':'Stop Timeout',
     'settings.chartHistory':'Chart History','settings.gpuPolling':'GPU Polling',
     'settings.docker':'Docker',
+    'misc.deployBtn':'Deploy →','misc.official':'Official','misc.localAccess':'Local access (via proxy)',
     // Port Toggle
     'port.all':'All','port.local':'Local',
     // Wizard
@@ -471,6 +479,12 @@ const LANG = {
     'deploy.userAction':'Manual action required',
     'deploy.triedNFixes':'AI tried {n} fixes',
     'deploy.manualRequired':'Manual action required',
+    'deploy.containerLogs':'Container Logs',
+    'deploy.refreshLogs':'Refresh Logs',
+    'deploy.restartContainer':'Restart Container',
+    'deploy.aiDiagnose':'Diagnose with AI',
+    'deploy.manualFixNeeded':'Deploy failed. Check the logs.',
+    'deploy.noLogs':'No logs found',
   }
 };
 let currentLang = localStorage.getItem('lang') || 'en';
