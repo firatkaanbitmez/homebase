@@ -856,3 +856,25 @@ tr[data-name]:hover .ctr-expand-icon{color:var(--text)}
 .deploy-final-card{background:var(--red-bg);border:1px solid rgba(239,68,68,.2);border-radius:var(--rs);padding:.7rem;margin-top:.5rem}
 .deploy-final-card-title{font-size:.78rem;font-weight:700;color:var(--red);margin-bottom:.3rem}
 .deploy-final-card-body{font-size:.75rem;color:var(--text-d);line-height:1.4}
+
+/* ═══ AI Configuration Panel ═══ */
+.ai-cfg{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:.75rem}
+.ai-cfg-table{width:100%;border-collapse:collapse}
+.ai-cfg-table tr{border-bottom:1px solid var(--border)}
+.ai-cfg-table tr:last-child{border-bottom:none}
+.ai-cfg-table td{padding:.55rem .8rem;vertical-align:middle}
+.ai-cfg-lbl{font-size:.72rem;font-weight:600;color:var(--text-d);white-space:nowrap;width:100px}
+.ai-cfg-select,.ai-cfg-input{width:100%;background:var(--bg-3);border:1px solid var(--border);border-radius:6px;padding:.35rem .6rem;font-size:.78rem;color:var(--text);font-family:inherit;outline:none;transition:border-color .15s}
+.ai-cfg-select:focus,.ai-cfg-input:focus{border-color:var(--accent)}
+.ai-cfg-input::placeholder{color:var(--text-m)}
+.ai-cfg-switch{position:relative;display:inline-block;width:36px;height:20px;cursor:pointer}
+.ai-cfg-switch input{opacity:0;width:0;height:0}
+.ai-cfg-slider{position:absolute;inset:0;background:var(--bg-4);border-radius:10px;transition:background .2s}
+.ai-cfg-slider::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s}
+.ai-cfg-switch input:checked+.ai-cfg-slider{background:var(--green)}
+.ai-cfg-switch input:checked+.ai-cfg-slider::after{transform:translateX(16px)}
+.ai-cfg-footer{display:flex;align-items:center;justify-content:space-between;padding:.5rem .8rem;background:var(--bg-3);border-top:1px solid var(--border)}
+.ai-cfg-status{font-size:.72rem;font-weight:600}
+.ai-cfg-save{display:inline-flex;align-items:center;gap:.35rem;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:.35rem .75rem;font-size:.72rem;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit}
+.ai-cfg-save:hover{background:var(--accent-l)}
+.ai-cfg-save:disabled{opacity:.5;pointer-events:none}

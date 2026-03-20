@@ -96,7 +96,7 @@ document.addEventListener('keydown', e => {
 // ─── Init ───
 // Set initial language
 const langBtn = $('#langToggle');
-if (langBtn) langBtn.textContent = currentLang.toUpperCase();
+if (langBtn) langBtn.textContent = currentLang === 'tr' ? 'EN' : 'TR';
 updateStaticStrings();
 
 renderSkeletons();

@@ -465,9 +465,9 @@ function setLang(lang) {
   updateStaticStrings();
   renderServices(); renderContainers();
   if ($('#settingsView').classList.contains('active')) renderEnv();
-  // Update lang toggle button text
+  // Update lang toggle button text — show the OTHER language (what you'll switch to)
   const langBtn = $('#langToggle');
-  if (langBtn) langBtn.textContent = currentLang.toUpperCase();
+  if (langBtn) langBtn.textContent = currentLang === 'tr' ? 'EN' : 'TR';
 }
 function updateStaticStrings() {
   $$('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));

@@ -159,13 +159,6 @@ async function renderEnv() {
             <div class="env-section open" style="margin-bottom:.75rem">
                 <div class="env-body" style="display:block;padding:.5rem">
                     <div class="env-row">
-                        <span class="env-key">${t('settings.language')}</span>
-                        <select style="background:var(--bg-3);border:1px solid var(--border);border-radius:6px;padding:.3rem .5rem;font-size:.75rem;color:var(--text);font-family:inherit;outline:none" onchange="setLang(this.value)">
-                            <option value="tr" ${currentLang==='tr'?'selected':''}>Türkçe</option>
-                            <option value="en" ${currentLang==='en'?'selected':''}>English</option>
-                        </select>
-                    </div>
-                    <div class="env-row">
                         <span class="env-key">${t('settings.polling')}</span>
                         <select style="background:var(--bg-3);border:1px solid var(--border);border-radius:6px;padding:.3rem .5rem;font-size:.75rem;color:var(--text);font-family:inherit;outline:none" onchange="updatePollInterval(this.value)">
                             <option value="3000" ${pollInterval===3000?'selected':''}>3s</option>
@@ -196,10 +189,86 @@ async function renderEnv() {
         </div>`;
     }
 
-    // HomeBase Settings (env vars)
-    if (systemCat.length > 0) {
+    // Separate AI Configuration from other system sections
+    const aiCat = systemCat.find(c => c.sec.name === 'AI Configuration');
+    const otherSystemCat = systemCat.filter(c => c.sec.name !== 'AI Configuration');
+
+    // ── AI Configuration Panel ──
+    if (aiCat) {
+        const vars = {};
+        aiCat.sec.vars.forEach(v => { vars[v.key] = v.value || ''; });
+        const isEnabled = vars.AI_ENABLED?.toLowerCase() === 'true';
+        const provider = vars.AI_PROVIDER || 'openai';
+        const model = vars.AI_MODEL || '';
+        const apiKey = vars.AI_API_KEY || '';
+        const baseUrl = vars.AI_BASE_URL || '';
+        const hasKey = apiKey.length > 0;
+
+        const providerOpts = [
+            { v: 'openai', l: 'OpenAI' },
+            { v: 'gemini', l: 'Google Gemini' },
+            { v: 'claude', l: 'Anthropic Claude' },
+            { v: 'custom', l: t('ai.providerCustom') }
+        ];
+        const modelPh = { openai: 'gpt-4.1-mini', gemini: 'gemini-2.5-flash', claude: 'claude-sonnet-4-20250514', custom: 'model-name' };
+
+        html += `<div class="settings-category">
+            <div class="settings-cat-header">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 014 4c0 1.95-1.4 3.58-3.25 3.93L12 22l-.75-12.07A4.001 4.001 0 0112 2z"/><path d="M8 8a4 4 0 00-1.5 7.7"/><path d="M16 8a4 4 0 011.5 7.7"/></svg>
+                ${t('settings.aiConfig')}
+                <span style="font-size:.6rem;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-m);margin-left:.5rem">${t('settings.aiConfigSub')}</span>
+            </div>
+            <div class="ai-cfg" id="aiCfgPanel">
+                <table class="ai-cfg-table">
+                    <tr>
+                        <td class="ai-cfg-lbl">${t('settings.aiEnabled')}</td>
+                        <td>
+                            <label class="ai-cfg-switch"><input type="checkbox" id="aiCfgEnabled" ${isEnabled ? 'checked' : ''}><span class="ai-cfg-slider"></span></label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="ai-cfg-lbl">${t('settings.aiProvider')}</td>
+                        <td>
+                            <select class="ai-cfg-select" id="aiCfgProvider" onchange="aiCfgProviderChanged()">
+                                ${providerOpts.map(p => `<option value="${p.v}" ${provider === p.v ? 'selected' : ''}>${p.l}</option>`).join('')}
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="ai-cfg-lbl">${t('settings.aiApiKey')}</td>
+                        <td>
+                            <input type="password" class="ai-cfg-input" id="aiCfgKey" value="${escHtml(apiKey)}" placeholder="sk-... / AIza..."
+                                onfocus="this.type='text'" onblur="this.type='password'">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="ai-cfg-lbl">${t('settings.aiModel')}</td>
+                        <td>
+                            <input type="text" class="ai-cfg-input" id="aiCfgModel" value="${escHtml(model)}" placeholder="${modelPh[provider] || 'model-name'}">
+                        </td>
+                    </tr>
+                    <tr class="ai-cfg-baseurl-row" style="${provider === 'custom' ? '' : 'display:none'}">
+                        <td class="ai-cfg-lbl">${t('settings.aiBaseUrl')}</td>
+                        <td>
+                            <input type="text" class="ai-cfg-input" id="aiCfgBaseUrl" value="${escHtml(baseUrl)}" placeholder="https://api.example.com/v1/chat/completions">
+                        </td>
+                    </tr>
+                </table>
+                <div class="ai-cfg-footer">
+                    <span class="ai-cfg-status" id="aiCfgStatus">${isEnabled ? (hasKey ? '<span style="color:var(--green)">● ' + t('settings.on') + '</span>' : '<span style="color:var(--yellow)">● ' + t('ai.noApiKey') + '</span>') : '<span style="color:var(--text-m)">● ' + t('settings.off') + '</span>'}</span>
+                    <button class="ai-cfg-save" id="aiCfgSaveBtn" onclick="saveAiConfig()">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        ${t('misc.saveApply')}
+                    </button>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // HomeBase Settings (env vars, excluding AI)
+    if (otherSystemCat.length > 0) {
         html += `<div class="settings-category"><div class="settings-cat-header"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/></svg> ${t('settings.homebaseSettings')} <span style="font-size:.6rem;font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-m);margin-left:.5rem">${t('settings.homebaseSettingsSub')}</span></div>`;
-        html += systemCat.map(({ sec, si }) => buildEnvSection(sec, si)).join('');
+        html += otherSystemCat.map(({ sec, si }) => buildEnvSection(sec, si)).join('');
         html += `</div>`;
     }
 
@@ -479,6 +548,58 @@ function buildEnvSection(sec, si) {
             </div>
         </div>
     </div>`;
+}
+
+// ── AI Config Panel Helpers ──
+function aiCfgProviderChanged() {
+    const prov = document.getElementById('aiCfgProvider')?.value || 'openai';
+    const ph = { openai: 'gpt-4.1-mini', gemini: 'gemini-2.5-flash', claude: 'claude-sonnet-4-20250514', custom: 'model-name' };
+    const modelInput = document.getElementById('aiCfgModel');
+    if (modelInput) modelInput.placeholder = ph[prov] || 'model-name';
+    document.querySelectorAll('.ai-cfg-baseurl-row').forEach(r => r.style.display = prov === 'custom' ? '' : 'none');
+}
+
+async function saveAiConfig() {
+    const enabled = document.getElementById('aiCfgEnabled')?.checked ? 'true' : 'false';
+    const provider = document.getElementById('aiCfgProvider')?.value || 'openai';
+    const apiKey = document.getElementById('aiCfgKey')?.value || '';
+    const model = document.getElementById('aiCfgModel')?.value || '';
+    const baseUrl = document.getElementById('aiCfgBaseUrl')?.value || '';
+
+    const changes = [
+        { key: 'AI_ENABLED', value: enabled, oldValue: '' },
+        { key: 'AI_PROVIDER', value: provider, oldValue: '' },
+        { key: 'AI_API_KEY', value: apiKey, oldValue: '' },
+        { key: 'AI_MODEL', value: model, oldValue: '' },
+        { key: 'AI_BASE_URL', value: baseUrl, oldValue: '' }
+    ];
+
+    const btn = document.getElementById('aiCfgSaveBtn');
+    const statusEl = document.getElementById('aiCfgStatus');
+    if (btn) { btn.disabled = true; btn.textContent = t('msg.saving'); }
+
+    try {
+        const res = await fetch('/api/Settings/env', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ changes, service: null })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            showToast(t('msg.settingsSaved'), 'success');
+            if (statusEl) statusEl.innerHTML = enabled === 'true'
+                ? (apiKey ? '<span style="color:var(--green)">● ' + t('settings.on') + '</span>' : '<span style="color:var(--yellow)">● ' + t('ai.noApiKey') + '</span>')
+                : '<span style="color:var(--text-m)">● ' + t('settings.off') + '</span>';
+        } else {
+            showToast(t('msg.saveFail'), 'error');
+        }
+    } catch {
+        showToast(t('msg.saveFail'), 'error');
+    }
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> ${t('misc.saveApply')}`;
+    }
 }
 
 function toggleBaseUrlVisibility(envBody) {
