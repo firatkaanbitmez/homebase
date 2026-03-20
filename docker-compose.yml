@@ -23,7 +23,9 @@ services:
       - homebase
 
   dashboard:
-    build: .
+    build:
+      context: ./src/HomeBase.API
+      dockerfile: Dockerfile
     container_name: homebase-api
     restart: unless-stopped
     ports:

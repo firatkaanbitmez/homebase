@@ -33,16 +33,24 @@ Open `http://localhost:3000` in your browser.
 
 ```
 homebase/
-├── Controllers/       # API endpoints
-├── Services/          # Business logic (Docker, Firewall, AI, Compose)
-├── Data/              # EF Core DbContext, seeder, service catalog
-├── Models/            # Entity models and DTOs
-├── Migrations/        # EF Core database migrations
-├── Middleware/         # Error handling middleware
-├── wwwroot/           # Frontend (HTML, CSS, JS, icons)
-├── docker-compose.yml # Infrastructure (PostgreSQL + Dashboard)
-├── Dockerfile         # Multi-stage build
-└── services/          # Per-service compose files (auto-generated)
+├── src/
+│   └── HomeBase.API/
+│       ├── Controllers/    # API endpoints
+│       ├── Services/       # Business logic (Docker, Firewall, AI, Compose)
+│       ├── Data/           # EF Core DbContext, seeder, service catalog
+│       ├── Models/         # Entity models and DTOs
+│       ├── Migrations/     # Database migrations
+│       ├── Middleware/      # Error handling
+│       ├── wwwroot/        # Frontend (HTML, CSS, JS, icons)
+│       ├── Dockerfile      # Multi-stage build
+│       └── Program.cs      # Application entry point
+├── scripts/                # Utility scripts
+│   └── firewall-worker.ps1
+├── runtime/                # Runtime data (gitignored)
+├── docker-compose.yml      # Infrastructure (PostgreSQL + Dashboard)
+├── homebase.sln            # Solution file
+├── README.md
+└── LICENSE
 ```
 
 ## Requirements

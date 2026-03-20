@@ -1,2 +1,11 @@
-bin/
-obj/
+**/bin/
+**/obj/
+**/.git/
+**/node_modules/
+postgres/data/
+runtime/
+.vs/
+.vscode/
+.idea/
+*.md
+LICENSE

@@ -1,6 +1,0 @@
-@HomeBase.API_HostAddress = http://localhost:5098
-
-GET {{HomeBase.API_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
