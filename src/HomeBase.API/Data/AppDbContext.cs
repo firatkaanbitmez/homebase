@@ -11,7 +11,7 @@ public class AppDbContext : DbContext
     public DbSet<Setting> Settings => Set<Setting>();
     public DbSet<ContainerState> ContainerStates => Set<ContainerState>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
-    public DbSet<FirewallRule> FirewallRules => Set<FirewallRule>();
+    public DbSet<PortAccessRule> PortAccessRules => Set<PortAccessRule>();
     public DbSet<ServiceCategory> ServiceCategories => Set<ServiceCategory>();
     public DbSet<SettingsHistory> SettingsHistory => Set<SettingsHistory>();
 
@@ -48,11 +48,11 @@ public class AppDbContext : DbContext
             .HasForeignKey(c => c.ServiceId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        // FirewallRule: keep (Port, Protocol) unique, add ServiceId FK
-        modelBuilder.Entity<FirewallRule>()
+        // PortAccessRule: keep (Port, Protocol) unique, add ServiceId FK
+        modelBuilder.Entity<PortAccessRule>()
             .HasIndex(f => new { f.Port, f.Protocol }).IsUnique();
 
-        modelBuilder.Entity<FirewallRule>()
+        modelBuilder.Entity<PortAccessRule>()
             .HasOne(f => f.Service)
             .WithMany()
             .HasForeignKey(f => f.ServiceId)

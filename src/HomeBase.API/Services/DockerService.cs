@@ -11,24 +11,25 @@ public class DockerService
 {
     private readonly DockerClient _client;
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly FirewallService _firewall;
     private readonly ComposeFileService _composeFile;
     private readonly IConfiguration _config;
     private readonly ILogger<DockerService> _logger;
+    private readonly DockerCacheService? _cacheService;
     private static readonly string[] ProtectedContainers = ["homebase-api", "homebase-db"];
 
-    public DockerService(IServiceScopeFactory scopeFactory, FirewallService firewall,
-        ComposeFileService composeFile, IConfiguration config, ILogger<DockerService> logger)
+    public DockerService(IServiceScopeFactory scopeFactory,
+        ComposeFileService composeFile, IConfiguration config, ILogger<DockerService> logger,
+        DockerCacheService? cacheService = null)
     {
         var dockerUri = OperatingSystem.IsWindows()
             ? new Uri("npipe://./pipe/docker_engine")
             : new Uri("unix:///var/run/docker.sock");
         _client = new DockerClientConfiguration(dockerUri).CreateClient();
         _scopeFactory = scopeFactory;
-        _firewall = firewall;
         _composeFile = composeFile;
         _config = config;
         _logger = logger;
+        _cacheService = cacheService;
     }
 
     private string ProjectDir => _config["Paths:ProjectDir"] ?? "/app/project";
@@ -37,6 +38,11 @@ public class DockerService
 
     public async Task<List<ContainerDto>> GetContainersAsync()
     {
+        // Use cache when available
+        if (_cacheService != null)
+            return await _cacheService.GetCachedContainersAsync();
+
+        // Fallback: direct Docker API (should not happen in normal operation)
         var containers = await _client.Containers.ListContainersAsync(new ContainersListParameters { All = true });
 
         using var scope = _scopeFactory.CreateScope();
@@ -60,7 +66,7 @@ public class DockerService
 
             var ports = c.Ports?
                 .Where(p => p.PublicPort > 0)
-                .Select(p => new PortDto((int)p.PublicPort, (int)p.PrivatePort))
+                .Select(p => new PortDto((int)p.PublicPort, (int)p.PrivatePort, p.IP))
                 .Distinct()
                 .ToList() ?? [];
 
@@ -71,6 +77,13 @@ public class DockerService
         });
 
         return (await Task.WhenAll(tasks)).ToList();
+    }
+
+    /// Notify cache to refresh after container state changes
+    public async Task NotifyCacheRefreshAsync()
+    {
+        if (_cacheService != null)
+            await _cacheService.InvalidateAndRefreshAsync();
     }
 
     private async Task<ContainerStatsDto?> GetStatsAsync(string id, CancellationToken token = default)
@@ -153,14 +166,14 @@ public class DockerService
             {
                 var composePath = Path.Combine(ProjectDir, svc.ComposeFilePath);
                 var (ok, err) = RunShell($"docker compose -f \"{composePath}\" up -d", 60000);
-                if (!ok) throw new Exception($"Container '{name}' bulunamadi ve yeniden olusturulamadi: {err}");
+                if (!ok) throw new Exception($"Container '{name}' not found and could not be recreated: {err}");
             }
             else
             {
                 // Fallback to legacy root compose
                 var composeName = svc?.ComposeName ?? name;
                 var (ok, err) = RunShell($"cd \"{ProjectDir}\" && docker compose up -d {composeName}", 60000);
-                if (!ok) throw new Exception($"Container '{name}' bulunamadi ve yeniden olusturulamadi: {err}");
+                if (!ok) throw new Exception($"Container '{name}' not found and could not be recreated: {err}");
             }
 
             await LogAsync("start", name, "Recreated via compose");
@@ -200,8 +213,8 @@ public class DockerService
                 {
                     var msg = ex.Message;
                     if (msg.Contains("port is already allocated") || msg.Contains("address already in use"))
-                        throw new Exception($"Port cakismasi: Baska bir servis ayni portu kullaniyor. Portu degistirin veya cakisan servisi durdurun.");
-                    throw new Exception($"Container baslatilamadi: {msg}");
+                        throw new Exception($"Port conflict: Another service is using the same port. Change the port or stop the conflicting service.");
+                    throw new Exception($"Failed to start container: {msg}");
                 }
             }
             else
@@ -212,15 +225,14 @@ public class DockerService
                 {
                     var msg = ex.Message;
                     if (msg.Contains("port is already allocated") || msg.Contains("address already in use"))
-                        throw new Exception($"Port cakismasi: Baska bir servis ayni portu kullaniyor. Portu degistirin veya cakisan servisi durdurun.");
-                    throw new Exception($"Container baslatilamadi: {msg}");
+                        throw new Exception($"Port conflict: Another service is using the same port. Change the port or stop the conflicting service.");
+                    throw new Exception($"Failed to start container: {msg}");
                 }
             }
 
             await LogAsync("start", name, "Recreated via compose (start failed)");
         }
 
-        await OpenFirewallPortsForContainerAsync(name);
     }
 
     public async Task<bool> RemoveContainerAsync(string name)
@@ -294,7 +306,6 @@ public class DockerService
 
         await SetDisabledAsync(name, true);
         await LogAsync("stop", name);
-        await CloseFirewallPortsForContainerAsync(name);
     }
 
     public async Task RestartContainerAsync(string name)
@@ -311,13 +322,13 @@ public class DockerService
             {
                 var composePath = Path.Combine(ProjectDir, svc.ComposeFilePath);
                 var (ok, err) = RunShell($"docker compose -f \"{composePath}\" up -d", 60000);
-                if (!ok) throw new Exception($"Container yeniden olusturulamadi: {err}");
+                if (!ok) throw new Exception($"Failed to recreate container: {err}");
             }
             else
             {
                 var target = svc?.ComposeName ?? name;
                 var (ok, err) = RunShell($"cd \"{ProjectDir}\" && docker compose up -d {target}", 60000);
-                if (!ok) throw new Exception($"Container yeniden olusturulamadi: {err}");
+                if (!ok) throw new Exception($"Failed to recreate container: {err}");
             }
             await LogAsync("restart", name, "Recreated via compose");
             return;
@@ -342,13 +353,13 @@ public class DockerService
             {
                 var composePath = Path.Combine(ProjectDir, svc.ComposeFilePath);
                 var (ok, err) = RunShell($"docker compose -f \"{composePath}\" up -d", 60000);
-                if (!ok) throw new Exception($"Container yeniden baslatilamadi: {err}");
+                if (!ok) throw new Exception($"Failed to restart container: {err}");
             }
             else
             {
                 var target = svc?.ComposeName ?? name;
                 var (ok, err) = RunShell($"cd \"{ProjectDir}\" && docker compose up -d {target}", 60000);
-                if (!ok) throw new Exception($"Container yeniden baslatilamadi: {err}");
+                if (!ok) throw new Exception($"Failed to restart container: {err}");
             }
             await LogAsync("restart", name, "Recreated via compose");
         }
@@ -478,66 +489,6 @@ public class DockerService
             sizeRootFs,
             networks
         );
-    }
-
-    /// Open firewall ports for a container based on its service's settings in DB
-    private async Task OpenFirewallPortsForContainerAsync(string containerName)
-    {
-        try
-        {
-            using var scope = _scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-            var svc = await db.Services.FirstOrDefaultAsync(s => s.ContainerName == containerName);
-            if (svc == null) return;
-
-            var portSettings = await db.Settings
-                .Where(s => s.IsPortVariable && (s.ServiceId == svc.Id || s.Section == svc.Name))
-                .ToListAsync();
-
-            foreach (var ps in portSettings)
-            {
-                if (int.TryParse(ps.Value, out var port) && port > 0)
-                {
-                    await _firewall.OpenPortAsync(port, $"SVC-{port}", "TCP", svc.Name);
-                    _logger.LogInformation("Start: opened firewall port {Port} for {Container}", port, containerName);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to open firewall ports for {Container}", containerName);
-        }
-    }
-
-    /// Close firewall ports for a container based on its service's settings in DB
-    private async Task CloseFirewallPortsForContainerAsync(string containerName)
-    {
-        try
-        {
-            using var scope = _scopeFactory.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-            var svc = await db.Services.FirstOrDefaultAsync(s => s.ContainerName == containerName);
-            if (svc == null) return;
-
-            var portSettings = await db.Settings
-                .Where(s => s.IsPortVariable && (s.ServiceId == svc.Id || s.Section == svc.Name))
-                .ToListAsync();
-
-            foreach (var ps in portSettings)
-            {
-                if (int.TryParse(ps.Value, out var port) && port > 0)
-                {
-                    await _firewall.ClosePortIfUnusedAsync(port, "TCP");
-                    _logger.LogInformation("Stop: closed firewall port {Port} for {Container}", port, containerName);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to close firewall ports for {Container}", containerName);
-        }
     }
 
     private async Task<ContainerListResponse?> FindContainerAsync(string name)

@@ -6,7 +6,7 @@ public record ContainerDto(
     int? IdleMinutes, bool Protected, bool UserDisabled
 );
 
-public record PortDto(int Public, int Private);
+public record PortDto(int Public, int Private, string? Ip = null);
 
 public record ContainerStatsDto(
     string Cpu, string MemPercent, string MemMB, long RxBytes, long TxBytes,
@@ -21,7 +21,7 @@ public record EnvVarDto(string Key, string Value, string? Description = null, bo
 public record EnvUpdateRequest(List<EnvChangeDto> Changes, string? Service, int? ServiceId = null);
 public record EnvChangeDto(string Key, string Value, string? OldValue);
 
-public record ApplyResult(bool Ok, string? Recreated, string? Error, bool FirewallUpdated);
+public record ApplyResult(bool Ok, string? Recreated, string? Error, bool PortsUpdated);
 public record DeleteResult(bool Ok, string? Error, List<string>? Warnings = null);
 
 public record ContainerInspectDto(
@@ -59,7 +59,7 @@ public record ServiceResponse(
     string ContainerName, int? PreferPort, string? UrlPath, bool IsEnabled,
     int SortOrder, string? ComposeName, string? Image, string? BuildContext,
     string? EnvFile, bool IsAutoDiscovered, string? Category, int? CategoryId,
-    string ServiceSlug = "", string? ComposeFilePath = null
+    string ServiceSlug = "", string? ComposeFilePath = null, string? DeployStatus = null
 );
 
 public record CreateServiceRequest(
@@ -85,7 +85,8 @@ public record ComposeServiceResponse(
 // Onboarding DTOs
 public record CatalogItemResponse(
     string Name, string Description, string Image, string Category,
-    string[] DefaultPorts, string[] DefaultVolumes, Dictionary<string, string> DefaultEnv
+    string[] DefaultPorts, string[] DefaultVolumes, Dictionary<string, string> DefaultEnv,
+    int StarCount = 0, long PullCount = 0, bool IsOfficial = false, string? LogoUrl = null
 );
 
 public record DeployRequest(
@@ -125,3 +126,8 @@ public record AiPortMapping(int Host, int Container);
 public record DirectoryEntry(string Name, string Path, bool HasSubdirs, bool IsProject);
 public record AiStatusResponse(bool Enabled, bool HasApiKey, string Model);
 public record WriteDockerfileRequest(string ProjectPath, string Content);
+
+public record PortAccessEntry(
+    int Port, string Protocol, string? ServiceName, string? ContainerName,
+    bool IsExternal, bool HasRule, int? ServiceId
+);

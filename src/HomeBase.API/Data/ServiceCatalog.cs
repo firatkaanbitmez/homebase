@@ -19,7 +19,6 @@ public static class ServiceCatalog
         new("Radarr", "Movie management", "linuxserver/radarr:latest", "Media", new[] { "7878:7878" }, new[] { "./radarr/config:/config" }),
 
         // Development
-        new("Archon", "AI-powered project management", "archon:latest", "Development", new[] { "3005:3005" }, Array.Empty<string>()),
         new("Gitea", "Lightweight Git hosting", "gitea/gitea:latest", "Development", new[] { "3003:3000", "2222:22" }, new[] { "./gitea/data:/data" }),
         new("Code Server", "VS Code in the browser", "linuxserver/code-server:latest", "Development", new[] { "8443:8443" }, new[] { "./code-server/config:/config" }),
         new("Drone", "CI/CD platform", "drone/drone:latest", "Development", new[] { "8000:80" }, Array.Empty<string>()),
@@ -38,7 +37,7 @@ public static class ServiceCatalog
         new("n8n", "Workflow automation", "n8nio/n8n:latest", "Productivity", new[] { "5678:5678" }, new[] { "./n8n/data:/home/node/.n8n" }),
         new("Stirling PDF", "PDF tools", "stirlingtools/stirling-pdf:latest", "Productivity", new[] { "8080:8080" }, Array.Empty<string>()),
         new("IT-Tools", "Developer utilities", "corentinth/it-tools:latest", "Productivity", new[] { "4000:80" }, Array.Empty<string>()),
-        new("Paperless-ngx", "Document management", "ghcr.io/paperless-ngx/paperless-ngx:latest", "Productivity", new[] { "8010:8000" }, new[] { "./paperless/data:/usr/src/paperless/data", "./paperless/media:/usr/src/paperless/media" }),
+        new("Paperless-ngx", "Document management", "paperlessngx/paperless-ngx:latest", "Productivity", new[] { "8010:8000" }, new[] { "./paperless/data:/usr/src/paperless/data", "./paperless/media:/usr/src/paperless/media" }),
 
         // Security
         new("Vaultwarden", "Bitwarden-compatible password manager", "vaultwarden/server:latest", "Security", new[] { "8081:80" }, new[] { "./vaultwarden/data:/data" }),
@@ -47,7 +46,7 @@ public static class ServiceCatalog
 
         // AI/ML
         new("Ollama", "Local LLM runtime", "ollama/ollama:latest", "AI/ML", new[] { "11434:11434" }, new[] { "./ollama/data:/root/.ollama" }),
-        new("Open WebUI", "Chat interface for LLMs", "ghcr.io/open-webui/open-webui:main", "AI/ML", new[] { "8090:8080" }, Array.Empty<string>(), new Dictionary<string, string> { ["OLLAMA_BASE_URL"] = "http://ollama:11434" }),
+        new("Open WebUI", "Chat interface for LLMs", "dyrnq/open-webui:latest", "AI/ML", new[] { "8090:8080" }, Array.Empty<string>(), new Dictionary<string, string> { ["OLLAMA_BASE_URL"] = "http://ollama:11434" }),
         new("LocalAI", "OpenAI-compatible local API", "localai/localai:latest", "AI/ML", new[] { "8084:8080" }, new[] { "./localai/models:/models" }),
 
         // Storage
@@ -61,9 +60,9 @@ public static class ServiceCatalog
         new("Portainer", "Docker management UI", "portainer/portainer-ce:latest", "Networking", new[] { "9000:9000" }, new[] { "/var/run/docker.sock:/var/run/docker.sock:ro", "./portainer/data:/data" }),
 
         // Data
-        new("CyberChef", "Data transformation tool", "ghcr.io/gchq/cyberchef:latest", "Productivity", new[] { "8100:80" }, Array.Empty<string>()),
-        new("Changedetection", "Website change tracker", "ghcr.io/dgtlmoon/changedetection.io:latest", "Monitoring", new[] { "5000:5000" }, new[] { "./changedetection/data:/datastore" }),
-        new("Home Assistant", "Home automation", "ghcr.io/home-assistant/home-assistant:stable", "Productivity", new[] { "8123:8123" }, new[] { "./homeassistant/config:/config" }),
+        new("CyberChef", "Data transformation tool", "mpepping/cyberchef:latest", "Productivity", new[] { "8100:80" }, Array.Empty<string>()),
+        new("Changedetection", "Website change tracker", "dgtlmoon/changedetection.io:latest", "Monitoring", new[] { "5000:5000" }, new[] { "./changedetection/data:/datastore" }),
+        new("Home Assistant", "Home automation", "homeassistant/home-assistant:latest", "Productivity", new[] { "8123:8123" }, new[] { "./homeassistant/config:/config" }),
     };
 }
 

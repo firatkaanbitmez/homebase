@@ -1,5 +1,7 @@
 using HomeBase.API.Data;
+using HomeBase.API.Hubs;
 using HomeBase.API.Models;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 
@@ -8,27 +10,30 @@ namespace HomeBase.API.Services;
 public class SettingsService
 {
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly FirewallService _firewall;
+    private readonly PortAccessService _portAccess;
     private readonly ComposeParserService _composeParser;
     private readonly ComposeFileService _composeFile;
     private readonly IConfiguration _config;
     private readonly ILogger<SettingsService> _logger;
+    private readonly IHubContext<DashboardHub> _hub;
 
     private static readonly HashSet<int> ReservedPorts = new()
     {
         22, 25, 110, 143, 445, 3389,
     };
 
-    public SettingsService(IServiceScopeFactory scopeFactory, FirewallService firewall,
+    public SettingsService(IServiceScopeFactory scopeFactory, PortAccessService portAccess,
         ComposeParserService composeParser, ComposeFileService composeFile,
-        IConfiguration config, ILogger<SettingsService> logger)
+        IConfiguration config, ILogger<SettingsService> logger,
+        IHubContext<DashboardHub> hub)
     {
         _scopeFactory = scopeFactory;
-        _firewall = firewall;
+        _portAccess = portAccess;
         _composeParser = composeParser;
         _composeFile = composeFile;
         _config = config;
         _logger = logger;
+        _hub = hub;
     }
 
     private string ProjectDir => _config["Paths:ProjectDir"] ?? "/app/project";
@@ -62,13 +67,13 @@ public class SettingsService
         if (!IsPortKey(key)) return (true, null);
 
         if (!int.TryParse(value, out var port))
-            return (false, $"'{value}' gecerli bir port degil (sayi olmali)");
+            return (false, $"'{value}' is not a valid port (must be a number)");
 
         if (port < 1 || port > 65535)
-            return (false, $"Port 1-65535 arasinda olmali (girilen: {port})");
+            return (false, $"Port must be between 1-65535 (given: {port})");
 
         if (ReservedPorts.Contains(port))
-            return (false, $"Port {port} sistem tarafindan kullaniliyor (reserved port)");
+            return (false, $"Port {port} is reserved by the system");
 
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -84,7 +89,7 @@ public class SettingsService
             int.TryParse(s.Value, out var existingPort) && existingPort == port);
 
         if (conflict != null)
-            return (false, $"Port {port} zaten '{conflict.Section}' tarafindan kullaniliyor ({conflict.Key})");
+            return (false, $"Port {port} is already in use by '{conflict.Section}' ({conflict.Key})");
 
         var sameSectionConflict = await db.Settings
             .Where(s => s.IsPortVariable && s.Section == section && s.Key != key)
@@ -97,7 +102,7 @@ public class SettingsService
             int.TryParse(s.Value, out var p) && p == port);
 
         if (selfConflict != null)
-            return (false, $"Port {port} ayni servis icinde '{selfConflict.Key}' tarafindan zaten kullaniliyor");
+            return (false, $"Port {port} is already used by '{selfConflict.Key}' in the same service");
 
         try
         {
@@ -106,7 +111,7 @@ public class SettingsService
             {
                 var sectionComposeName = await ResolveComposeNameAsync(db, section);
                 if (sectionComposeName != portInfo.ComposeName)
-                    return (false, $"Port {port} compose'da '{portInfo.ComposeName}' tarafindan hardcoded olarak kullaniliyor");
+                    return (false, $"Port {port} is hardcoded in compose by '{portInfo.ComposeName}'");
             }
         }
         catch (Exception ex)
@@ -123,10 +128,10 @@ public class SettingsService
     public async Task<(bool valid, string? error)> ValidateNewServicePortAsync(int port, string serviceName)
     {
         if (port < 1 || port > 65535)
-            return (false, $"Port {port} gecersiz (1-65535 arasinda olmali)");
+            return (false, $"Port {port} is invalid (must be between 1-65535)");
 
         if (ReservedPorts.Contains(port))
-            return (false, $"Port {port} sistem tarafindan kullaniliyor");
+            return (false, $"Port {port} is reserved by the system");
 
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -134,13 +139,13 @@ public class SettingsService
         var allPorts = await db.Settings.Where(s => s.IsPortVariable).ToListAsync();
         var conflict = allPorts.FirstOrDefault(s => int.TryParse(s.Value, out var p) && p == port);
         if (conflict != null)
-            return (false, $"Port {port} zaten '{conflict.Section}' tarafindan kullaniliyor ({conflict.Key})");
+            return (false, $"Port {port} is already in use by '{conflict.Section}' ({conflict.Key})");
 
         try
         {
             var composePorts = _composeParser.GetAllHostPorts();
             if (composePorts.TryGetValue(port, out var info))
-                return (false, $"Port {port} compose'da '{info.ComposeName}' tarafindan kullaniliyor");
+                return (false, $"Port {port} is used in compose by '{info.ComposeName}'");
         }
         catch (Exception ex)
         {
@@ -189,7 +194,7 @@ public class SettingsService
                         var otherSetting = await db.Settings.FirstOrDefaultAsync(s => s.Key == batchConflict.Key);
                         if (otherSetting != null && otherSetting.Section != setting.Section)
                             return new ApplyResult(false, null,
-                                $"Port {newPort} ayni batch icerisinde hem '{setting.Section}' ({change.Key}) hem '{otherSetting.Section}' ({batchConflict.Key}) tarafindan talep ediliyor", false);
+                                $"Port {newPort} is requested by both '{setting.Section}' ({change.Key}) and '{otherSetting.Section}' ({batchConflict.Key}) in the same batch", false);
                     }
                 }
             }
@@ -269,16 +274,19 @@ public class SettingsService
             }
         }
 
-        // 5. Update firewall
-        bool fwUpdated = false;
+        // 5. Update port access rules
+        bool portsUpdated = false;
         foreach (var pc in portChanges)
         {
-            await _firewall.ClosePortIfUnusedAsync(pc.OldPort, pc.Protocol, excludeSection: pc.Section);
-            await _firewall.OpenPortAsync(pc.NewPort, $"SVC-{pc.NewPort}", pc.Protocol, serviceName: pc.Section);
-            fwUpdated = true;
+            await _portAccess.ClosePortIfUnusedAsync(pc.OldPort, pc.Protocol, excludeSection: pc.Section);
+            await _portAccess.OpenPortAsync(pc.NewPort, $"SVC-{pc.NewPort}", pc.Protocol, serviceName: pc.Section);
+            portsUpdated = true;
         }
 
-        return new ApplyResult(true, recreated, error2, fwUpdated);
+        // Broadcast settings changed via SignalR
+        try { await _hub.Clients.All.SendAsync("SettingsChanged", new { section = request.Service }); } catch { }
+
+        return new ApplyResult(true, recreated, error2, portsUpdated);
     }
 
     /// Regenerate a service's compose file with current env vars from DB

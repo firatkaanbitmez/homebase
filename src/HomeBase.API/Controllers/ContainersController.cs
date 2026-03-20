@@ -1,7 +1,9 @@
 using HomeBase.API.Data;
+using HomeBase.API.Hubs;
 using HomeBase.API.Models;
 using HomeBase.API.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace HomeBase.API.Controllers;
@@ -12,11 +14,13 @@ public class ContainersController : ControllerBase
 {
     private readonly DockerService _docker;
     private readonly AppDbContext _db;
+    private readonly IHubContext<DashboardHub> _hub;
 
-    public ContainersController(DockerService docker, AppDbContext db)
+    public ContainersController(DockerService docker, AppDbContext db, IHubContext<DashboardHub> hub)
     {
         _docker = docker;
         _db = db;
+        _hub = hub;
     }
 
     [HttpGet]
@@ -32,9 +36,10 @@ public class ContainersController : ControllerBase
         try
         {
             await _docker.StartContainerAsync(name);
+            _ = _docker.NotifyCacheRefreshAsync();
             return Ok(new { ok = true, action = "started", name });
         }
-        catch (Exception ex) when (ex.Message.Contains("not found") || ex.Message.Contains("bulunamadi"))
+        catch (Exception ex) when (ex.Message.Contains("not found"))
         {
             return NotFound(new ApiError("CONTAINER_NOT_FOUND", ex.Message));
         }
@@ -54,6 +59,7 @@ public class ContainersController : ControllerBase
         try
         {
             await _docker.StopContainerAsync(name);
+            _ = _docker.NotifyCacheRefreshAsync();
             return Ok(new { ok = true, action = "stopped", name });
         }
         catch (Exception ex) when (ex.Message.Contains("Protected"))
@@ -72,6 +78,7 @@ public class ContainersController : ControllerBase
         try
         {
             await _docker.RestartContainerAsync(name);
+            _ = _docker.NotifyCacheRefreshAsync();
             return Ok(new { ok = true, action = "restarted", name });
         }
         catch (Exception ex)
@@ -90,11 +97,11 @@ public class ContainersController : ControllerBase
         }
         catch (Exception ex) when (ex.Message.Contains("not found"))
         {
-            return NotFound(new ApiError("CONTAINER_NOT_FOUND", $"Container '{name}' bulunamadi"));
+            return NotFound(new ApiError("CONTAINER_NOT_FOUND", $"Container '{name}' not found"));
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new ApiError("DOCKER_ERROR", "Log alinamadi", ex.Message));
+            return StatusCode(500, new ApiError("DOCKER_ERROR", "Failed to fetch logs", ex.Message));
         }
     }
 
@@ -104,12 +111,12 @@ public class ContainersController : ControllerBase
         try
         {
             var result = await _docker.InspectContainerAsync(name);
-            if (result == null) return NotFound(new ApiError("CONTAINER_NOT_FOUND", $"Container '{name}' bulunamadi"));
+            if (result == null) return NotFound(new ApiError("CONTAINER_NOT_FOUND", $"Container '{name}' not found"));
             return Ok(result);
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new ApiError("DOCKER_ERROR", "Inspect basarisiz", ex.Message));
+            return StatusCode(500, new ApiError("DOCKER_ERROR", "Inspect failed", ex.Message));
         }
     }
 

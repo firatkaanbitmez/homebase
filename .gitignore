@@ -2,6 +2,7 @@ bin/
 obj/
 postgres/data/
 runtime/*
+services/*
 !runtime/.gitkeep
 *.user
 *.suo

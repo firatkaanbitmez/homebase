@@ -8,14 +8,17 @@ public class InactivityMonitor : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly DockerService _docker;
+    private readonly DockerCacheService _cache;
     private readonly ILogger<InactivityMonitor> _logger;
     private readonly Dictionary<string, (long rx, long tx, DateTime lastChange)> _tracker = new();
     private readonly TimeSpan _inactivityLimit = TimeSpan.FromHours(1);
 
-    public InactivityMonitor(IServiceScopeFactory scopeFactory, DockerService docker, ILogger<InactivityMonitor> logger)
+    public InactivityMonitor(IServiceScopeFactory scopeFactory, DockerService docker,
+        DockerCacheService cache, ILogger<InactivityMonitor> logger)
     {
         _scopeFactory = scopeFactory;
         _docker = docker;
+        _cache = cache;
         _logger = logger;
     }
 
@@ -83,7 +86,7 @@ public class InactivityMonitor : BackgroundService
     {
         try
         {
-            var containers = await _docker.GetContainersAsync();
+            var containers = await _cache.GetCachedContainersAsync();
             var now = DateTime.UtcNow;
 
             foreach (var c in containers.Where(c => c.State == "running" && !c.Protected && !c.UserDisabled))

@@ -11,7 +11,7 @@ public class ServiceManagementService
     private readonly ComposeFileService _composeFile;
     private readonly SettingsService _settingsService;
     private readonly DockerService _docker;
-    private readonly FirewallService _firewall;
+    private readonly PortAccessService _portAccess;
     private readonly ILogger<ServiceManagementService> _logger;
 
     public ServiceManagementService(
@@ -20,7 +20,7 @@ public class ServiceManagementService
         ComposeFileService composeFile,
         SettingsService settingsService,
         DockerService docker,
-        FirewallService firewall,
+        PortAccessService portAccess,
         ILogger<ServiceManagementService> logger)
     {
         _scopeFactory = scopeFactory;
@@ -28,7 +28,7 @@ public class ServiceManagementService
         _composeFile = composeFile;
         _settingsService = settingsService;
         _docker = docker;
-        _firewall = firewall;
+        _portAccess = portAccess;
         _logger = logger;
     }
 
@@ -142,13 +142,13 @@ public class ServiceManagementService
         }
         catch (Exception ex) { warnings.Add($"Settings: {ex.Message}"); }
 
-        // 4. Firewall cleanup
+        // 4. Port access cleanup
         try
         {
             foreach (var port in portValues)
-                await _firewall.ClosePortIfUnusedAsync(port, "TCP", excludeSection: null);
+                await _portAccess.ClosePortIfUnusedAsync(port, "TCP", excludeSection: null);
         }
-        catch (Exception ex) { warnings.Add($"Firewall: {ex.Message}"); }
+        catch (Exception ex) { warnings.Add($"Port access: {ex.Message}"); }
 
         // 5. DB record removal
         try
@@ -227,9 +227,16 @@ public class ServiceManagementService
             }
             else
             {
-                // Update compose metadata
-                existing.ServiceSlug = slug;
-                existing.ComposeFilePath = _composeFile.GetRelativeComposeFilePath(slug);
+                // Update compose metadata — only set slug if not already taken
+                if (existing.ServiceSlug != slug)
+                {
+                    var slugConflict = await db.Services.AnyAsync(s => s.ServiceSlug == slug && s.Id != existing.Id);
+                    if (!slugConflict)
+                    {
+                        existing.ServiceSlug = slug;
+                        existing.ComposeFilePath = _composeFile.GetRelativeComposeFilePath(slug);
+                    }
+                }
                 existing.Image = def.Image ?? existing.Image;
                 existing.BuildContext = def.BuildContext ?? existing.BuildContext;
                 existing.EnvFile = def.EnvFiles.FirstOrDefault() ?? existing.EnvFile;
@@ -245,12 +252,22 @@ public class ServiceManagementService
         foreach (var def in infraDefs)
         {
             var containerName = def.ContainerName ?? def.ComposeName;
+            // Check both DB and pending local adds (to avoid duplicate slugs)
             var existing = await db.Services.FirstOrDefaultAsync(s =>
                 s.ComposeName == def.ComposeName || s.ContainerName == containerName);
+            if (existing == null)
+                existing = db.ChangeTracker.Entries<Service>()
+                    .Select(e => e.Entity)
+                    .FirstOrDefault(s => s.ComposeName == def.ComposeName || s.ContainerName == containerName);
 
             if (existing == null)
             {
+                // Also skip if slug already taken by a pending add
                 var slug = _composeFile.GenerateUniqueSlug(def.ComposeName);
+                var slugTaken = db.ChangeTracker.Entries<Service>()
+                    .Any(e => e.Entity.ServiceSlug == slug);
+                if (slugTaken) continue;
+
                 var svc = new Service
                 {
                     Name = FormatServiceName(def.ComposeName),
@@ -273,7 +290,13 @@ public class ServiceManagementService
             else
             {
                 if (string.IsNullOrEmpty(existing.ServiceSlug))
-                    existing.ServiceSlug = _composeFile.GenerateUniqueSlug(def.ComposeName);
+                {
+                    var newSlug = _composeFile.GenerateUniqueSlug(def.ComposeName);
+                    var slugTaken = await db.Services.AnyAsync(s => s.ServiceSlug == newSlug && s.Id != existing.Id)
+                        || db.ChangeTracker.Entries<Service>().Any(e => e.Entity != existing && e.Entity.ServiceSlug == newSlug);
+                    if (!slugTaken)
+                        existing.ServiceSlug = newSlug;
+                }
                 existing.ComposeName = def.ComposeName;
                 existing.Image = def.Image ?? existing.Image;
                 existing.BuildContext = def.BuildContext ?? existing.BuildContext;
@@ -309,7 +332,7 @@ public class ServiceManagementService
                     foreach (var val in portSettings)
                     {
                         if (int.TryParse(val, out var port))
-                            await _firewall.ClosePortIfUnusedAsync(port, "TCP");
+                            await _portAccess.ClosePortIfUnusedAsync(port, "TCP");
                     }
                 }
                 catch (Exception ex)
@@ -355,7 +378,7 @@ public class ServiceManagementService
             .Select(p => p.Length > 0 ? char.ToUpper(p[0]) + p[1..] : p));
     }
 
-    private static string GenerateColor(string name)
+    public static string GenerateColor(string name)
     {
         var hash = name.GetHashCode();
         var colors = new[] { "#e74c3c", "#3498db", "#10b981", "#f59e0b", "#8b5cf6", "#06b6d4", "#f97316", "#ec4899", "#6366f1", "#14b8a6" };

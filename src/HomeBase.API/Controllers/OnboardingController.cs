@@ -1,7 +1,9 @@
 using HomeBase.API.Data;
+using HomeBase.API.Hubs;
 using HomeBase.API.Models;
 using HomeBase.API.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 using System.Text;
@@ -15,30 +17,33 @@ public class OnboardingController : ControllerBase
     private readonly ComposeFileService _composeFile;
     private readonly ServiceManagementService _svcMgmt;
     private readonly SettingsService _settings;
-    private readonly FirewallService _firewall;
+    private readonly PortAccessService _portAccess;
     private readonly DockerHubService _dockerHub;
     private readonly DockerService _docker;
     private readonly IConfiguration _config;
     private readonly ILogger<OnboardingController> _logger;
+    private readonly IHubContext<DashboardHub> _hub;
 
     public OnboardingController(
         ComposeFileService composeFile,
         ServiceManagementService svcMgmt,
         SettingsService settings,
-        FirewallService firewall,
+        PortAccessService portAccess,
         DockerHubService dockerHub,
         DockerService docker,
         IConfiguration config,
-        ILogger<OnboardingController> logger)
+        ILogger<OnboardingController> logger,
+        IHubContext<DashboardHub> hub)
     {
         _composeFile = composeFile;
         _svcMgmt = svcMgmt;
         _settings = settings;
-        _firewall = firewall;
+        _portAccess = portAccess;
         _dockerHub = dockerHub;
         _docker = docker;
         _config = config;
         _logger = logger;
+        _hub = hub;
     }
 
     private string ProjectDir => _config["Paths:ProjectDir"] ?? "/app/project";
@@ -52,23 +57,27 @@ public class OnboardingController : ControllerBase
     }
 
     [HttpGet("catalog")]
-    public IActionResult GetCatalog()
+    public async Task<IActionResult> GetCatalog()
     {
-        var items = ServiceCatalog.GetAll().Select(e => new CatalogItemResponse(
+        var entries = ServiceCatalog.GetAll();
+        var enriched = await _dockerHub.EnrichCatalogAsync(entries);
+        return Ok(enriched.Select(e => new CatalogItemResponse(
             e.Name, e.Description, e.Image, e.Category,
-            e.DefaultPorts, e.DefaultVolumes, e.DefaultEnv
-        ));
-        return Ok(items);
+            e.DefaultPorts, e.DefaultVolumes, e.DefaultEnv,
+            e.StarCount, e.PullCount, e.IsOfficial, e.LogoUrl
+        )));
     }
 
     [HttpGet("catalog/{name}")]
-    public IActionResult GetCatalogItem(string name)
+    public async Task<IActionResult> GetCatalogItem(string name)
     {
         var entry = ServiceCatalog.GetByName(name);
         if (entry == null) return NotFound();
+        var info = await _dockerHub.GetRepoInfoAsync(entry.Image);
         return Ok(new CatalogItemResponse(
-            entry.Name, entry.Description, entry.Image, entry.Category,
-            entry.DefaultPorts, entry.DefaultVolumes, entry.DefaultEnv
+            entry.Name, info?.Description ?? entry.Description, entry.Image, entry.Category,
+            entry.DefaultPorts, entry.DefaultVolumes, entry.DefaultEnv,
+            info?.StarCount ?? 0, info?.PullCount ?? 0, info?.IsOfficial ?? false, info?.LogoUrl
         ));
     }
 
@@ -100,7 +109,7 @@ public class OnboardingController : ControllerBase
             // 2. Check if container name already in use by Docker
             var (ctrCheckOk, ctrCheckOut) = _docker.RunShell($"docker inspect -f '{{{{.State.Status}}}}' {slug}", 5000);
             if (ctrCheckOk && !string.IsNullOrWhiteSpace(ctrCheckOut))
-                return Ok(new DeployResponse(false, null, $"'{slug}' adında bir container zaten çalışıyor. Farklı bir isim seçin."));
+                return Ok(new DeployResponse(false, null, $"A container named '{slug}' is already running. Choose a different name."));
 
             // 3. Parse and validate all ports
             var parsedPorts = new Dictionary<string, (int Host, int Container)>();
@@ -113,12 +122,12 @@ public class OnboardingController : ControllerBase
                     {
                         var parts = portVal.Split(':');
                         if (!int.TryParse(parts[0], out hostPort) || !int.TryParse(parts[1], out containerPort))
-                            return Ok(new DeployResponse(false, null, $"'{portVal}' gecerli bir port degil"));
+                            return Ok(new DeployResponse(false, null, $"'{portVal}' is not a valid port"));
                     }
                     else
                     {
                         if (!int.TryParse(portVal, out hostPort))
-                            return Ok(new DeployResponse(false, null, $"'{portVal}' gecerli bir port degil"));
+                            return Ok(new DeployResponse(false, null, $"'{portVal}' is not a valid port"));
                         containerPort = hostPort;
                     }
 
@@ -128,6 +137,16 @@ public class OnboardingController : ControllerBase
 
                     parsedPorts[portVar] = (hostPort, containerPort);
                 }
+            }
+
+            // 3b. Auto-assign port if none specified
+            if (parsedPorts.Count == 0 && !string.IsNullOrEmpty(request.Image))
+            {
+                var containerPort = DetectContainerPort(request.Image);
+                var hostPort = await FindAvailablePortAsync(containerPort, request.Name);
+                var varName = composeName.ToUpper().Replace("-", "_") + "_PORT";
+                parsedPorts[varName] = (hostPort, containerPort);
+                _logger.LogInformation("Auto-assigned port {Host}:{Container} for {Service}", hostPort, containerPort, composeName);
             }
 
             // 4. Build compose definition
@@ -174,7 +193,7 @@ public class OnboardingController : ControllerBase
             // 5. Add port variables to compose definition
             foreach (var (portVar, (hostPort, containerPort)) in parsedPorts)
             {
-                def.Ports.Add($"${{{portVar}:-{hostPort}}}:{containerPort}");
+                def.Ports.Add($"127.0.0.1:${{{portVar}:-{hostPort}}}:{containerPort}");
             }
 
             // Use slug as container name
@@ -186,7 +205,7 @@ public class OnboardingController : ControllerBase
                 Name = request.Name,
                 Description = request.Description ?? $"Deployed from {request.Image ?? request.BuildContext}",
                 Icon = $"/icons/{composeName}.png",
-                Color = ServiceManagementService_GenerateColor(composeName),
+                Color = ServiceManagementService.GenerateColor(composeName),
                 ContainerName = slug,
                 ServiceSlug = slug,
                 ComposeFilePath = _composeFile.GetRelativeComposeFilePath(slug),
@@ -197,11 +216,6 @@ public class OnboardingController : ControllerBase
                 IsEnabled = true,
                 SortOrder = 999,
             };
-            if (!string.IsNullOrEmpty(request.Category))
-            {
-                // Try to find category by name
-                // We don't have direct DB access here; set it after creation if needed
-            }
             svc = await _svcMgmt.CreateAsync(svc);
 
             // 7. Create settings records (with ServiceId FK)
@@ -226,53 +240,62 @@ public class OnboardingController : ControllerBase
             // 9. Write per-service docker-compose.yml
             await _composeFile.WriteServiceComposeAsync(svc, def);
 
-            // 10. Start the service via per-service compose
-            var composePath = _composeFile.GetComposeFilePath(slug);
-            var (startOk, startErr) = _docker.RunShell($"docker compose -f \"{composePath}\" up -d", 120000);
-            if (!startOk)
-            {
-                _logger.LogError("Failed to start service: {Service} — {Error}", slug, startErr);
-                foreach (var (_, (hp, _)) in parsedPorts)
-                    try { await _firewall.ClosePortIfUnusedAsync(hp, "TCP"); } catch { }
-                return Ok(new DeployResponse(false, slug, $"Service added but failed to start: {startErr}"));
-            }
-
-            // 11. Verify container is running
-            for (int i = 0; i < 5; i++)
-            {
-                await Task.Delay(2000);
-                var (checkOk, checkOut) = _docker.RunShell($"docker inspect -f '{{{{.State.Status}}}}' {slug}", 5000);
-                if (checkOk && checkOut?.Trim() == "running")
-                {
-                    _logger.LogInformation("Deployed and verified service: {Service}", slug);
-
-                    // Open firewall ports
-                    foreach (var (_, (hostPort, _)) in parsedPorts)
-                    {
-                        try { await _firewall.OpenPortAsync(hostPort, $"SVC-{hostPort}", "TCP", request.Name); }
-                        catch (Exception ex) { _logger.LogWarning(ex, "Failed to open firewall port {Port}", hostPort); }
-                    }
-
-                    return Ok(new DeployResponse(true, slug, null));
-                }
-                if (checkOk && checkOut?.Trim() == "exited")
-                {
-                    foreach (var (_, (hp, _)) in parsedPorts)
-                        try { await _firewall.ClosePortIfUnusedAsync(hp, "TCP"); } catch { }
-                    var (_, logOut) = _docker.RunShell($"docker logs --tail 10 {slug}", 5000);
-                    return Ok(new DeployResponse(false, slug,
-                        $"Container started but exited immediately. Logs: {logOut?.Trim()}"));
-                }
-            }
-
-            // 12. Open firewall ports
+            // 10. Register port access rules immediately
             foreach (var (_, (hostPort, _)) in parsedPorts)
             {
-                try { await _firewall.OpenPortAsync(hostPort, $"SVC-{hostPort}", "TCP", request.Name); }
-                catch (Exception ex) { _logger.LogWarning(ex, "Failed to open firewall port {Port}", hostPort); }
+                try { await _portAccess.OpenPortAsync(hostPort, $"SVC-{hostPort}", "TCP", request.Name); }
+                catch (Exception ex) { _logger.LogWarning(ex, "Failed to register port access rule {Port}", hostPort); }
             }
 
-            _logger.LogInformation("Deployed service: {Service} (status unverified)", slug);
+            // 11. Start the service in the background (image pull + compose up)
+            var composePath = _composeFile.GetComposeFilePath(slug);
+            var capturedSlug = slug;
+            var capturedSvcId = svc.Id;
+            svc.DeployStatus = "deploying";
+            using (var deployScope = HttpContext.RequestServices.CreateScope())
+            {
+                var deployDb = deployScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var deploySvc = await deployDb.Services.FindAsync(capturedSvcId);
+                if (deploySvc != null) { deploySvc.DeployStatus = "deploying"; await deployDb.SaveChangesAsync(); }
+            }
+            var scopeFactory = HttpContext.RequestServices.GetRequiredService<IServiceScopeFactory>();
+            var hubRef = _hub;
+            _ = Task.Run(async () =>
+            {
+                try { await hubRef.Clients.All.SendAsync("DeployProgress", new { slug = capturedSlug, status = "deploying", message = "Pulling image and starting container..." }); } catch { }
+
+                var (ok, err) = _docker.RunShell($"docker compose -f \"{composePath}\" up -d", 300000);
+                try
+                {
+                    using var bgScope = scopeFactory.CreateScope();
+                    var bgDb = bgScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    var bgSvc = await bgDb.Services.FindAsync(capturedSvcId);
+                    if (bgSvc != null)
+                    {
+                        bgSvc.DeployStatus = ok ? null : "failed";
+                        await bgDb.SaveChangesAsync();
+                    }
+                }
+                catch (Exception ex) { _logger.LogError(ex, "Failed to update deploy status for {Service}", capturedSlug); }
+
+                if (!ok)
+                {
+                    _logger.LogError("Background deploy failed for {Service}: {Error}", capturedSlug, err);
+                    try { await hubRef.Clients.All.SendAsync("DeployProgress", new { slug = capturedSlug, status = "failed", message = err ?? "Deploy failed" }); } catch { }
+                }
+                else
+                {
+                    _logger.LogInformation("Background deploy completed for {Service}", capturedSlug);
+                    try
+                    {
+                        await hubRef.Clients.All.SendAsync("DeployProgress", new { slug = capturedSlug, status = "ready", message = "Service deployed successfully" });
+                        await _docker.NotifyCacheRefreshAsync();
+                    }
+                    catch { }
+                }
+            });
+
+            _logger.LogInformation("Deploy started in background for {Service}", slug);
             return Ok(new DeployResponse(true, slug, null));
         }
         catch (Exception ex)
@@ -353,10 +376,51 @@ public class OnboardingController : ControllerBase
         return sb.ToString();
     }
 
-    private static string ServiceManagementService_GenerateColor(string name)
+    /// Detect common container port for known Docker images
+    private static int DetectContainerPort(string image)
     {
-        var hash = name.GetHashCode();
-        var colors = new[] { "#e74c3c", "#3498db", "#10b981", "#f59e0b", "#8b5cf6", "#06b6d4", "#f97316", "#ec4899", "#6366f1", "#14b8a6" };
-        return colors[Math.Abs(hash) % colors.Length];
+        var known = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["stirling-pdf"] = 8080, ["s-pdf"] = 8080,
+            ["nginx"] = 80, ["httpd"] = 80, ["caddy"] = 80,
+            ["traefik"] = 80, ["haproxy"] = 80,
+            ["grafana"] = 3000, ["metabase"] = 3000, ["gitea"] = 3000,
+            ["prometheus"] = 9090,
+            ["portainer"] = 9000, ["sonarqube"] = 9000,
+            ["filebrowser"] = 80, ["nextcloud"] = 80, ["wordpress"] = 80,
+            ["vaultwarden"] = 80, ["ghost"] = 2368,
+            ["code-server"] = 8080, ["jenkins"] = 8080, ["nocodb"] = 8080,
+            ["adminer"] = 8080, ["dozzle"] = 8080, ["open-webui"] = 8080,
+            ["jellyfin"] = 8096, ["plex"] = 32400,
+            ["minio"] = 9000, ["mongo-express"] = 8081, ["redis-commander"] = 8081,
+            ["uptime-kuma"] = 3001, ["n8n"] = 5678,
+            ["changedetection"] = 5000,
+            ["it-tools"] = 80, ["cyberchef"] = 80, ["phpmyadmin"] = 80,
+            ["glances"] = 61208, ["homer"] = 8080, ["heimdall"] = 80,
+            ["homarr"] = 7575, ["dashy"] = 8080,
+            ["pihole"] = 80, ["adguard"] = 3000,
+            ["syncthing"] = 8384, ["duplicati"] = 8200,
+            ["freshrss"] = 80, ["wallabag"] = 80,
+            ["calibre-web"] = 8083, ["komga"] = 25600,
+            ["bookstack"] = 80, ["wiki"] = 3000,
+        };
+
+        var imageLower = image.Split(':')[0].ToLower();
+        foreach (var (key, port) in known)
+            if (imageLower.Contains(key)) return port;
+
+        return 8080; // sensible default
+    }
+
+    /// Find the next available host port starting from preferred
+    private async Task<int> FindAvailablePortAsync(int preferred, string serviceName)
+    {
+        for (int port = preferred; port < preferred + 100; port++)
+        {
+            if (port <= 0 || port > 65535) continue;
+            var (valid, _) = await _settings.ValidateNewServicePortAsync(port, serviceName);
+            if (valid) return port;
+        }
+        return preferred;
     }
 }

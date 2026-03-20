@@ -1,7 +1,9 @@
 using HomeBase.API.Data;
+using HomeBase.API.Hubs;
 using HomeBase.API.Middleware;
 using HomeBase.API.Models;
 using HomeBase.API.Services;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,7 +18,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // Services
 builder.Services.AddSingleton<DockerService>();
-builder.Services.AddSingleton<FirewallService>();
+builder.Services.AddSingleton<PortAccessService>();
 builder.Services.AddSingleton<SystemService>();
 builder.Services.AddSingleton<GpuService>();
 builder.Services.AddSingleton<ComposeParserService>();
@@ -27,11 +29,28 @@ builder.Services.AddSingleton<AiService>();
 builder.Services.AddScoped<SettingsService>();
 builder.Services.AddHostedService<InactivityMonitor>();
 
+// Docker Cache + SignalR
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<DockerCacheService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DockerCacheService>());
+builder.Services.AddSignalR();
+
+// Proxy HttpClient
+builder.Services.AddHttpClient("proxy", c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(30);
+}).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    AllowAutoRedirect = false
+});
+
 // API
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
+builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
+    p.AllowAnyMethod().AllowAnyHeader()
+     .AllowCredentials().SetIsOriginAllowed(_ => true)));
 
 var app = builder.Build();
 
@@ -85,9 +104,6 @@ using (var scope = app.Services.CreateScope())
     logger.LogInformation("Startup compose sync: {Created} created, {Updated} updated, {Orphaned} orphaned",
         result.Created, result.Updated, result.Orphaned);
 
-    // Sync firewall state
-    var firewall = scope.ServiceProvider.GetRequiredService<FirewallService>();
-    await firewall.SyncFirewallStateAsync();
 }
 
 app.UseCors();
@@ -97,7 +113,21 @@ app.UseSwaggerUI();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapControllers();
+app.MapHub<DashboardHub>("/hubs/dashboard");
 app.MapFallbackToFile("index.html");
+
+// Wire up DockerCacheService → SignalR broadcasts
+var cacheService = app.Services.GetRequiredService<DockerCacheService>();
+var hubContext = app.Services.GetRequiredService<IHubContext<DashboardHub>>();
+
+cacheService.OnContainersChanged += async containers =>
+{
+    await hubContext.Clients.All.SendAsync("ContainersUpdated", containers);
+};
+cacheService.OnStatsUpdated += async containers =>
+{
+    await hubContext.Clients.All.SendAsync("ContainersUpdated", containers);
+};
 
 app.Run();
 

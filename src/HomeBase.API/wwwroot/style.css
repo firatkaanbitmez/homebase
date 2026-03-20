@@ -492,6 +492,9 @@ tr[data-name]:hover .ctr-expand-icon{color:var(--text)}
 .catalog-item-cat{font-size:.55rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--accent-l);background:var(--accent-bg);padding:.15rem .35rem;border-radius:3px}
 .catalog-item-desc{font-size:.7rem;color:var(--text-d);margin-bottom:.3rem;line-height:1.3}
 .catalog-item-image{font-size:.6rem;color:var(--text-m);font-family:'Consolas','Courier New',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.catalog-item-logo{width:24px;height:24px;border-radius:4px;object-fit:contain;flex-shrink:0;margin-right:.4rem}
+.catalog-item-header{gap:.4rem}
+.catalog-item-meta{display:flex;gap:.8rem;font-size:.6rem;color:var(--text-m);margin-top:.3rem}
 
 /* ═══ Add Service Button ═══ */
 .add-service-btn{position:fixed;bottom:1.5rem;right:1.5rem;width:48px;height:48px;border-radius:50%;background:var(--accent);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(99,102,241,.3);transition:all .2s;z-index:50}
@@ -711,3 +714,36 @@ tr[data-name]:hover .ctr-expand-icon{color:var(--text)}
 .toggle:hover{box-shadow:0 0 0 3px rgba(99,102,241,.15)}
 .modal{animation:modalSlideUp .2s ease}
 @keyframes modalSlideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+/* ═══ SignalR Live Status ═══ */
+.live-pill.connected{color:var(--green);background:var(--green-bg)}
+.live-pill.connected .live-dot{background:var(--green)}
+.live-pill.reconnecting{color:var(--yellow);background:rgba(245,158,11,.1)}
+.live-pill.reconnecting .live-dot{background:var(--yellow);animation:blink .5s ease infinite}
+.live-pill.disconnected{color:var(--red);background:rgba(239,68,68,.1)}
+.live-pill.disconnected .live-dot{background:var(--red);animation:none}
+
+/* ═══ Proxy Badge ═══ */
+.proxy-badge{font-size:.6rem;margin-left:.3rem;vertical-align:middle;opacity:.7}
+
+/* ═══ Toast Progress Bar ═══ */
+.toast{position:relative;overflow:hidden}
+.toast-progress{position:absolute;bottom:0;left:0;right:0;height:2px;background:rgba(255,255,255,.1)}
+.toast-progress-bar{height:100%;background:currentColor;opacity:.3;animation:toastCountdown linear forwards}
+@keyframes toastCountdown{from{width:100%}to{width:0%}}
+
+/* ═══ Panel Right Modal ═══ */
+.modal-overlay.panel-right{justify-content:flex-end;align-items:stretch}
+.modal-overlay.panel-right .modal{position:fixed;right:0;top:0;bottom:0;width:480px;max-width:90vw;border-radius:16px 0 0 16px;margin:0;max-height:100vh;overflow-y:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);animation:none}
+.modal-overlay.panel-right.active .modal{transform:translateX(0)}
+
+/* Bottom sheet on mobile */
+@media(max-width:768px){
+    .modal-overlay.panel-right{align-items:flex-end;justify-content:stretch}
+    .modal-overlay.panel-right .modal{position:fixed;bottom:0;left:0;right:0;top:auto;width:100%;max-width:100%;max-height:85vh;border-radius:16px 16px 0 0;transform:translateY(100%);transition:transform .3s cubic-bezier(.16,1,.3,1)}
+    .modal-overlay.panel-right.active .modal{transform:translateY(0)}
+}
+
+/* Panel-right overlay uses active class instead of animation */
+.modal-overlay.panel-right{animation:none;background:rgba(0,0,0,0);transition:background .2s ease}
+.modal-overlay.panel-right.active{background:rgba(0,0,0,.55)}

@@ -11,13 +11,15 @@ namespace HomeBase.API.Controllers;
 public class SettingsController : ControllerBase
 {
     private readonly SettingsService _settings;
-    private readonly FirewallService _firewall;
+    private readonly PortAccessService _portAccess;
+    private readonly DockerService _docker;
     private readonly AppDbContext _db;
 
-    public SettingsController(SettingsService settings, FirewallService firewall, AppDbContext db)
+    public SettingsController(SettingsService settings, PortAccessService portAccess, DockerService docker, AppDbContext db)
     {
         _settings = settings;
-        _firewall = firewall;
+        _portAccess = portAccess;
+        _docker = docker;
         _db = db;
     }
 
@@ -47,33 +49,22 @@ public class SettingsController : ControllerBase
         return Ok(new { valid, error });
     }
 
-    /// Sync firewall state — queue open commands for all active ports
-    [HttpPost("firewall/sync")]
-    public async Task<IActionResult> SyncFirewall()
+    /// Get port access overview: all ports from containers + rules merged
+    [HttpGet("ports/overview")]
+    public async Task<IActionResult> GetPortOverview()
     {
-        try
-        {
-            await _firewall.SyncFirewallStateAsync();
-            return Ok(new { ok = true, message = "Firewall sync queued" });
-        }
-        catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
-    }
-
-    /// Get all port states (port, isExternal, serviceName)
-    [HttpGet("firewall/ports")]
-    public async Task<IActionResult> GetPortStates()
-    {
-        return Ok(await _firewall.GetPortStatesAsync());
+        var containers = await _docker.GetContainersAsync();
+        return Ok(await _portAccess.GetPortOverviewAsync(containers));
     }
 
     /// Toggle a port's external access
-    [HttpPost("firewall/toggle")]
+    [HttpPost("ports/toggle")]
     public async Task<IActionResult> TogglePort([FromBody] PortToggleRequest request)
     {
         try
         {
-            await _firewall.SetPortExternalAsync(request.Port, request.External, request.ServiceName);
-            return Ok(new { ok = true });
+            var needsRestart = await _portAccess.SetPortExternalAsync(request.Port, request.External, request.ServiceName);
+            return Ok(new { ok = true, needsRestart });
         }
         catch (Exception ex) { return StatusCode(500, new { error = ex.Message }); }
     }
