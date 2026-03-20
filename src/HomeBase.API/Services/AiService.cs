@@ -48,8 +48,12 @@ public class AiService
         var model = aiSettings.FirstOrDefault(s => s.Key == "AI_MODEL")?.Value ?? "gpt-4.1-mini";
         var provider = aiSettings.FirstOrDefault(s => s.Key == "AI_PROVIDER")?.Value ?? "openai";
         var baseUrl = aiSettings.FirstOrDefault(s => s.Key == "AI_BASE_URL")?.Value ?? "";
+        var maxTokensStr = aiSettings.FirstOrDefault(s => s.Key == "AI_MAX_TOKENS")?.Value;
+        var maxTokens = int.TryParse(maxTokensStr, out var mt) ? mt : 4000;
+        var maxAttemptsStr = aiSettings.FirstOrDefault(s => s.Key == "AI_MAX_ATTEMPTS")?.Value;
+        var maxAttempts = int.TryParse(maxAttemptsStr, out var ma) ? ma : 3;
 
-        return new AiConfig(enabled, apiKey, model, provider, baseUrl);
+        return new AiConfig(enabled, apiKey, model, provider, baseUrl, maxTokens, maxAttempts);
     }
 
     private string GetEndpointUrl(string provider, string baseUrl)
@@ -314,7 +318,7 @@ Return ONLY valid JSON (no markdown, no text before/after):
         userPrompt.AppendLine();
         userPrompt.AppendLine("Analyze the above files carefully and return the JSON configuration. The service MUST start successfully on first try.");
 
-        var content = await CallAiAsync(config, systemPrompt, userPrompt.ToString(), 0.3, 2000);
+        var content = await CallAiAsync(config, systemPrompt, userPrompt.ToString(), 0.3, Math.Min(config.MaxTokens, 2000));
         var jsonContent = ExtractJson(content);
 
         // Parse AI response
@@ -556,7 +560,7 @@ If the issue requires project source file changes that cannot be worked around v
 
         try
         {
-            var raw = await CallAiAsync(config, systemPrompt, userPrompt.ToString(), 0.1, 4000);
+            var raw = await CallAiAsync(config, systemPrompt, userPrompt.ToString(), 0.1, config.MaxTokens);
             var jsonContent = ExtractJson(raw);
 
             using var aiDoc = JsonDocument.Parse(jsonContent);
@@ -681,7 +685,7 @@ Return ONLY the JSON, nothing else.";
     }
 }
 
-public record AiConfig(bool Enabled, string? ApiKey, string Model, string Provider, string BaseUrl);
+public record AiConfig(bool Enabled, string? ApiKey, string Model, string Provider, string BaseUrl, int MaxTokens = 4000, int MaxAttempts = 3);
 
 public record DeployContext(
     string ContainerName,

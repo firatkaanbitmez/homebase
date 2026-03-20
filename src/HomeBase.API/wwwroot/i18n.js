@@ -56,6 +56,10 @@ const LANG = {
     'settings.enable':'Etkinleştir','settings.searchPlaceholder':'Ayar ara...',
     'settings.language':'Dil',
     'settings.memUsed':'kullanımda',
+    'settings.aiMaxTokens':'AI Token Limiti','settings.aiMaxAttempts':'AI Max Deneme',
+    'settings.composeTimeout':'Compose Zaman Aşımı','settings.stopTimeout':'Durdurma Süresi',
+    'settings.chartHistory':'Grafik Geçmişi','settings.gpuPolling':'GPU Yenileme',
+    'settings.docker':'Docker',
     // Port Toggle
     'port.all':'Herkese Açık','port.local':'Yerel',
     // Wizard
@@ -288,6 +292,10 @@ const LANG = {
     'settings.enable':'Enable','settings.searchPlaceholder':'Search settings...',
     'settings.language':'Language',
     'settings.memUsed':'in use',
+    'settings.aiMaxTokens':'AI Token Limit','settings.aiMaxAttempts':'AI Max Attempts',
+    'settings.composeTimeout':'Compose Timeout','settings.stopTimeout':'Stop Timeout',
+    'settings.chartHistory':'Chart History','settings.gpuPolling':'GPU Polling',
+    'settings.docker':'Docker',
     // Port Toggle
     'port.all':'All','port.local':'Local',
     // Wizard

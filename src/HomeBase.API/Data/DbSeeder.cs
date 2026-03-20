@@ -77,6 +77,48 @@ public static class DbSeeder
             await db.SaveChangesAsync();
         }
 
+        // Ensure AI_MAX_TOKENS and AI_MAX_ATTEMPTS exist
+        if (!await db.Settings.AnyAsync(s => s.Key == "AI_MAX_TOKENS"))
+        {
+            var aiOrder = await db.Settings.CountAsync();
+            db.Settings.Add(new Setting { Section = "AI Configuration", Key = "AI_MAX_TOKENS", Value = "4000",
+                              IsSecret = false, SortOrder = aiOrder, Description = "AI response token limit" });
+            await db.SaveChangesAsync();
+        }
+        if (!await db.Settings.AnyAsync(s => s.Key == "AI_MAX_ATTEMPTS"))
+        {
+            var aiOrder = await db.Settings.CountAsync();
+            db.Settings.Add(new Setting { Section = "AI Configuration", Key = "AI_MAX_ATTEMPTS", Value = "3",
+                              IsSecret = false, SortOrder = aiOrder, Description = "Deploy fix max attempts" });
+            await db.SaveChangesAsync();
+        }
+
+        // Ensure Docker settings exist
+        if (!await db.Settings.AnyAsync(s => s.Key == "COMPOSE_TIMEOUT"))
+        {
+            var order = await db.Settings.CountAsync();
+            db.Settings.AddRange(
+                new Setting { Section = "Docker", Key = "COMPOSE_TIMEOUT", Value = "120",
+                              IsSecret = false, SortOrder = order++, Description = "Compose operation timeout (seconds)" },
+                new Setting { Section = "Docker", Key = "CONTAINER_STOP_TIMEOUT", Value = "10",
+                              IsSecret = false, SortOrder = order++, Description = "Container graceful shutdown timeout (seconds)" }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        // Ensure Dashboard settings exist
+        if (!await db.Settings.AnyAsync(s => s.Key == "CHART_HISTORY"))
+        {
+            var order = await db.Settings.CountAsync();
+            db.Settings.AddRange(
+                new Setting { Section = "Dashboard", Key = "CHART_HISTORY", Value = "60",
+                              IsSecret = false, SortOrder = order++, Description = "Chart data points count" },
+                new Setting { Section = "Dashboard", Key = "GPU_POLL_INTERVAL", Value = "10",
+                              IsSecret = false, SortOrder = order++, Description = "GPU info refresh interval (seconds)" }
+            );
+            await db.SaveChangesAsync();
+        }
+
         // Ensure AI_PROVIDER and AI_BASE_URL exist (for existing installations)
         if (!await db.Settings.AnyAsync(s => s.Key == "AI_PROVIDER"))
         {

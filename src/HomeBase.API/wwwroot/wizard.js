@@ -19,7 +19,7 @@ function openDeployPanel(slug, name) {
             { id: 1, status: 'deploying', startTime: Date.now(), endTime: null, reasoning: null, fixDescription: null, userAction: null, logs: null, collapsed: false }
         ],
         previousAttempts: [],
-        maxAttempts: 3
+        maxAttempts: parseInt(localStorage.getItem('AI_MAX_ATTEMPTS')) || 3
     };
 
     const panel = document.getElementById('deployPanel');

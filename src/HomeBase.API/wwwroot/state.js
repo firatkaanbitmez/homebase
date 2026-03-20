@@ -3,7 +3,8 @@
 let containers = [], services = [];
 let envSections = []; // settings data per service
 let disksData = []; // disk usage for settings health dashboard
-const cpuH = [], memH = [], HLEN = 60;
+const cpuH = [], memH = [];
+let HLEN = parseInt(localStorage.getItem('CHART_HISTORY')) || 60;
 let viewMode = localStorage.getItem('viewMode') || 'grid';
 const transitioning = new Set();
 const deletingServiceIds = new Set(); // guard for delete race condition

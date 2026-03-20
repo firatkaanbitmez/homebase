@@ -8,16 +8,21 @@ async function loadEnv() {
         if (!containers.length && !services.length) await fetchAll();
         const res = await fetch('/api/Settings/env/raw');
         envData = await res.json();
+        // Sync configurable settings to localStorage
+        const syncKeys = ['AI_MAX_TOKENS','AI_MAX_ATTEMPTS','COMPOSE_TIMEOUT','CONTAINER_STOP_TIMEOUT','CHART_HISTORY','GPU_POLL_INTERVAL'];
+        if (envData) envData.forEach(sec => sec.vars.forEach(v => {
+            if (syncKeys.includes(v.key) && v.value) localStorage.setItem(v.key, v.value);
+        }));
         renderEnv();
     } catch {
         showToast(t('msg.settingsFail'), 'error');
     }
 }
 
-const systemSections = new Set(['General', 'Dashboard', 'AI Configuration']);
+const systemSections = new Set(['General', 'Dashboard', 'AI Configuration', 'Docker']);
 
 // Translate DB section names
-const SECTION_I18N = { 'AI Configuration':'settings.aiConfig','General':'settings.general','Dashboard':'nav.dashboard' };
+const SECTION_I18N = { 'AI Configuration':'settings.aiConfig','General':'settings.general','Dashboard':'nav.dashboard','Docker':'settings.docker' };
 function tSection(name) { return SECTION_I18N[name] ? t(SECTION_I18N[name]) : name; }
 
 function updatePollInterval(val) {
@@ -25,6 +30,20 @@ function updatePollInterval(val) {
     localStorage.setItem('pollInterval', pollInterval);
     restartPolling();
     showToast(`${t('msg.pollingChanged')}: ${pollInterval / 1000}s`, 'success');
+}
+
+async function updateConfigSetting(key, value) {
+    localStorage.setItem(key, value);
+    try {
+        await fetch('/api/Settings/env', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ changes: [{ key, value, oldValue: '' }], service: null })
+        });
+        showToast(`${t('msg.settingsSaved')}`, 'success');
+    } catch {
+        showToast(t('msg.saveFail'), 'error');
+    }
 }
 
 async function renderEnv() {
@@ -166,6 +185,42 @@ async function renderEnv() {
                             <option value="10000" ${pollInterval===10000?'selected':''}>10s</option>
                             <option value="15000" ${pollInterval===15000?'selected':''}>15s</option>
                             <option value="30000" ${pollInterval===30000?'selected':''}>30s</option>
+                        </select>
+                    </div>
+                    <div class="env-row">
+                        <span class="env-key">${t('settings.aiMaxAttempts')}</span>
+                        <select style="background:var(--bg-3);border:1px solid var(--border);border-radius:6px;padding:.3rem .5rem;font-size:.75rem;color:var(--text);font-family:inherit;outline:none" onchange="updateConfigSetting('AI_MAX_ATTEMPTS',this.value)">
+                            ${[1,2,3,4,5].map(v => `<option value="${v}" ${(parseInt(localStorage.getItem('AI_MAX_ATTEMPTS'))||3)===v?'selected':''}>${v}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="env-row">
+                        <span class="env-key">${t('settings.aiMaxTokens')}</span>
+                        <select style="background:var(--bg-3);border:1px solid var(--border);border-radius:6px;padding:.3rem .5rem;font-size:.75rem;color:var(--text);font-family:inherit;outline:none" onchange="updateConfigSetting('AI_MAX_TOKENS',this.value)">
+                            ${[1000,2000,3000,4000,6000,8000].map(v => `<option value="${v}" ${(parseInt(localStorage.getItem('AI_MAX_TOKENS'))||4000)===v?'selected':''}>${v}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="env-row">
+                        <span class="env-key">${t('settings.composeTimeout')}</span>
+                        <select style="background:var(--bg-3);border:1px solid var(--border);border-radius:6px;padding:.3rem .5rem;font-size:.75rem;color:var(--text);font-family:inherit;outline:none" onchange="updateConfigSetting('COMPOSE_TIMEOUT',this.value)">
+                            ${[60,120,180,300].map(v => `<option value="${v}" ${(parseInt(localStorage.getItem('COMPOSE_TIMEOUT'))||120)===v?'selected':''}>${v}s</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="env-row">
+                        <span class="env-key">${t('settings.stopTimeout')}</span>
+                        <select style="background:var(--bg-3);border:1px solid var(--border);border-radius:6px;padding:.3rem .5rem;font-size:.75rem;color:var(--text);font-family:inherit;outline:none" onchange="updateConfigSetting('CONTAINER_STOP_TIMEOUT',this.value)">
+                            ${[5,10,15,30].map(v => `<option value="${v}" ${(parseInt(localStorage.getItem('CONTAINER_STOP_TIMEOUT'))||10)===v?'selected':''}>${v}s</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="env-row">
+                        <span class="env-key">${t('settings.chartHistory')}</span>
+                        <select style="background:var(--bg-3);border:1px solid var(--border);border-radius:6px;padding:.3rem .5rem;font-size:.75rem;color:var(--text);font-family:inherit;outline:none" onchange="updateConfigSetting('CHART_HISTORY',this.value)">
+                            ${[30,60,120,300].map(v => `<option value="${v}" ${(parseInt(localStorage.getItem('CHART_HISTORY'))||60)===v?'selected':''}>${v}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="env-row">
+                        <span class="env-key">${t('settings.gpuPolling')}</span>
+                        <select style="background:var(--bg-3);border:1px solid var(--border);border-radius:6px;padding:.3rem .5rem;font-size:.75rem;color:var(--text);font-family:inherit;outline:none" onchange="updateConfigSetting('GPU_POLL_INTERVAL',this.value)">
+                            ${[5,10,15,30,60].map(v => `<option value="${v}" ${(parseInt(localStorage.getItem('GPU_POLL_INTERVAL'))||10)===v?'selected':''}>${v}s</option>`).join('')}
                         </select>
                     </div>
                     <div class="env-row">

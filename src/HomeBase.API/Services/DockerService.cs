@@ -155,6 +155,7 @@ public class DockerService
     public async Task StartContainerAsync(string name)
     {
         await SetDisabledAsync(name, false);
+        var composeTimeoutMs = await GetSettingIntAsync("COMPOSE_TIMEOUT", 120) * 1000;
 
         var container = await FindContainerAsync(name);
 
@@ -165,14 +166,14 @@ public class DockerService
             if (svc?.ComposeFilePath != null)
             {
                 var composePath = Path.Combine(ProjectDir, svc.ComposeFilePath);
-                var (ok, err) = RunShell($"docker compose -f \"{composePath}\" up -d", 60000);
+                var (ok, err) = RunShell($"docker compose -f \"{composePath}\" up -d", composeTimeoutMs);
                 if (!ok) throw new Exception($"Container '{name}' not found and could not be recreated: {err}");
             }
             else
             {
                 // Fallback to legacy root compose
                 var composeName = svc?.ComposeName ?? name;
-                var (ok, err) = RunShell($"cd \"{ProjectDir}\" && docker compose up -d {composeName}", 60000);
+                var (ok, err) = RunShell($"cd \"{ProjectDir}\" && docker compose up -d {composeName}", composeTimeoutMs);
                 if (!ok) throw new Exception($"Container '{name}' not found and could not be recreated: {err}");
             }
 
@@ -208,7 +209,7 @@ public class DockerService
             if (svc?.ComposeFilePath != null)
             {
                 var composePath = Path.Combine(ProjectDir, svc.ComposeFilePath);
-                var (ok, err) = RunShell($"docker compose -f \"{composePath}\" up -d", 60000);
+                var (ok, err) = RunShell($"docker compose -f \"{composePath}\" up -d", composeTimeoutMs);
                 if (!ok)
                 {
                     var msg = ex.Message;
@@ -220,7 +221,7 @@ public class DockerService
             else
             {
                 var target = svc?.ComposeName ?? name;
-                var (ok, err) = RunShell($"cd \"{ProjectDir}\" && docker compose up -d {target}", 60000);
+                var (ok, err) = RunShell($"cd \"{ProjectDir}\" && docker compose up -d {target}", composeTimeoutMs);
                 if (!ok)
                 {
                     var msg = ex.Message;
@@ -238,6 +239,7 @@ public class DockerService
     public async Task<bool> RemoveContainerAsync(string name)
     {
         if (IsProtected(name)) throw new Exception("Protected container cannot be removed");
+        var stopTimeout = (uint)await GetSettingIntAsync("CONTAINER_STOP_TIMEOUT", 10);
 
         var container = await FindContainerAsync(name);
         if (container == null)
@@ -251,7 +253,7 @@ public class DockerService
             if (container.State == "running")
             {
                 await _client.Containers.StopContainerAsync(container.ID,
-                    new ContainerStopParameters { WaitBeforeKillSeconds = 10 });
+                    new ContainerStopParameters { WaitBeforeKillSeconds = stopTimeout });
             }
             await _client.Containers.RemoveContainerAsync(container.ID,
                 new ContainerRemoveParameters { Force = true, RemoveVolumes = false });
@@ -279,6 +281,7 @@ public class DockerService
     public async Task StopContainerAsync(string name)
     {
         if (IsProtected(name)) throw new Exception("Protected container");
+        var stopTimeout = (uint)await GetSettingIntAsync("CONTAINER_STOP_TIMEOUT", 10);
 
         var container = await FindContainerAsync(name);
         if (container == null)
@@ -297,7 +300,7 @@ public class DockerService
         try
         {
             await _client.Containers.StopContainerAsync(container.ID,
-                new ContainerStopParameters { WaitBeforeKillSeconds = 10 });
+                new ContainerStopParameters { WaitBeforeKillSeconds = stopTimeout });
         }
         catch (DockerApiException ex) when (ex.Message.Contains("is not running"))
         {
@@ -310,6 +313,7 @@ public class DockerService
 
     public async Task RestartContainerAsync(string name)
     {
+        var composeTimeoutMs = await GetSettingIntAsync("COMPOSE_TIMEOUT", 120) * 1000;
         var container = await FindContainerAsync(name);
 
         if (container == null)
@@ -321,13 +325,13 @@ public class DockerService
             if (svc?.ComposeFilePath != null)
             {
                 var composePath = Path.Combine(ProjectDir, svc.ComposeFilePath);
-                var (ok, err) = RunShell($"docker compose -f \"{composePath}\" up -d", 60000);
+                var (ok, err) = RunShell($"docker compose -f \"{composePath}\" up -d", composeTimeoutMs);
                 if (!ok) throw new Exception($"Failed to recreate container: {err}");
             }
             else
             {
                 var target = svc?.ComposeName ?? name;
-                var (ok, err) = RunShell($"cd \"{ProjectDir}\" && docker compose up -d {target}", 60000);
+                var (ok, err) = RunShell($"cd \"{ProjectDir}\" && docker compose up -d {target}", composeTimeoutMs);
                 if (!ok) throw new Exception($"Failed to recreate container: {err}");
             }
             await LogAsync("restart", name, "Recreated via compose");
@@ -352,13 +356,13 @@ public class DockerService
             if (svc?.ComposeFilePath != null)
             {
                 var composePath = Path.Combine(ProjectDir, svc.ComposeFilePath);
-                var (ok, err) = RunShell($"docker compose -f \"{composePath}\" up -d", 60000);
+                var (ok, err) = RunShell($"docker compose -f \"{composePath}\" up -d", composeTimeoutMs);
                 if (!ok) throw new Exception($"Failed to restart container: {err}");
             }
             else
             {
                 var target = svc?.ComposeName ?? name;
-                var (ok, err) = RunShell($"cd \"{ProjectDir}\" && docker compose up -d {target}", 60000);
+                var (ok, err) = RunShell($"cd \"{ProjectDir}\" && docker compose up -d {target}", composeTimeoutMs);
                 if (!ok) throw new Exception($"Failed to restart container: {err}");
             }
             await LogAsync("restart", name, "Recreated via compose");
@@ -529,6 +533,19 @@ public class DockerService
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         db.AuditLogs.Add(new AuditLog { Action = action, Target = target, Details = details });
         await db.SaveChangesAsync();
+    }
+
+    private async Task<int> GetSettingIntAsync(string key, int defaultVal)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var setting = await db.Settings.FirstOrDefaultAsync(s => s.Key == key);
+            if (setting != null && int.TryParse(setting.Value, out var val)) return val;
+        }
+        catch { }
+        return defaultVal;
     }
 
     public (bool ok, string? output) RunShell(string command, int timeoutMs)

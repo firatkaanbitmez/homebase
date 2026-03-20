@@ -102,7 +102,7 @@ updateStaticStrings();
 renderSkeletons();
 loadEnvData(); // Load settings data for card display
 fetchGpuInfo(); // Initial GPU check
-setInterval(fetchGpuInfo, 10000); // GPU refresh every 10s
+setInterval(fetchGpuInfo, (parseInt(localStorage.getItem('GPU_POLL_INTERVAL')) || 10) * 1000); // GPU refresh
 fetchAll();
 // Start with polling, then transition to SignalR
 pollTimer = setInterval(fetchAll, pollInterval);
