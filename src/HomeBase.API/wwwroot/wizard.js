@@ -277,7 +277,7 @@ async function openOnboardingWizard() {
                     <div class="wizard-panel active" data-panel="dockerhub">
                         <div class="search-box" style="margin:0 0 .8rem;max-width:100%">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                            <input type="text" id="dhSearch" placeholder="Docker Hub (e.g. nginx, postgres, grafana)" autocomplete="off">
+                            <input type="text" id="dhSearch" placeholder="${t('wizard.dhPlaceholder')}" autocomplete="off">
                         </div>
                         <div id="dhResults" class="dh-results">
                             <div class="empty-state" style="padding:2rem"><div class="empty-state-msg">${t('msg.searchHint')}</div></div>
@@ -607,11 +607,11 @@ function addRow(containerSel, type, val1, val2, exposed) {
     const row = document.createElement('div');
     row.className = 'mapping-row';
     if (type === 'port') {
-        row.innerHTML = `<input type="number" placeholder="Host Port" class="mp-host" value="${val1 || ''}"><span class="mapping-sep">:</span><input type="number" placeholder="Container Port" class="mp-container" value="${val2 || ''}"><div class="port-access-indicator"><button type="button" class="port-mini-toggle ${exposed !== false ? 'on' : ''} mp-ext"></button><span class="port-access-label ${exposed !== false ? 'external' : 'local'}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>${exposed !== false ? t('port.all') : t('port.local')}</span></div><button class="mapping-remove">×</button>`;
+        row.innerHTML = `<input type="number" placeholder="${t('wizard.hostPort')}" class="mp-host" value="${val1 || ''}"><span class="mapping-sep">:</span><input type="number" placeholder="${t('wizard.containerPort')}" class="mp-container" value="${val2 || ''}"><div class="port-access-indicator"><button type="button" class="port-mini-toggle ${exposed !== false ? 'on' : ''} mp-ext"></button><span class="port-access-label ${exposed !== false ? 'external' : 'local'}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>${exposed !== false ? t('port.all') : t('port.local')}</span></div><button class="mapping-remove">×</button>`;
     } else if (type === 'volume') {
-        row.innerHTML = `<input type="text" placeholder="./data" class="mv-host" value="${escHtml(val1 || '')}"><span class="mapping-sep">:</span><input type="text" placeholder="/data" class="mv-container" value="${escHtml(val2 || '')}"><button class="mapping-remove">×</button>`;
+        row.innerHTML = `<input type="text" placeholder="${t('wizard.hostPath')}" class="mv-host" value="${escHtml(val1 || '')}"><span class="mapping-sep">:</span><input type="text" placeholder="${t('wizard.containerPath')}" class="mv-container" value="${escHtml(val2 || '')}"><button class="mapping-remove">×</button>`;
     } else if (type === 'env') {
-        row.innerHTML = `<input type="text" placeholder="KEY" class="me-key" value="${escHtml(val1 || '')}"><span class="mapping-sep">=</span><input type="text" placeholder="value" class="me-val" value="${escHtml(val2 || '')}"><button class="mapping-remove">×</button>`;
+        row.innerHTML = `<input type="text" placeholder="${t('wizard.envKey')}" class="me-key" value="${escHtml(val1 || '')}"><span class="mapping-sep">=</span><input type="text" placeholder="${t('wizard.envValue')}" class="me-val" value="${escHtml(val2 || '')}"><button class="mapping-remove">×</button>`;
     }
     container.appendChild(row);
 }

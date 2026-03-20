@@ -51,6 +51,8 @@ function updateStats() {
 
     // Sidebar container count & nav badge
     $('#sidebarCtrCount').innerHTML = `<span class="ctr-num">${run.length}</span> / ${containers.length} ${t('misc.containerActive')}`;
+    const navBadge = $('#navSvcCount');
+    if (navBadge) navBadge.textContent = run.length;
 }
 
 // ─── Expanded Chart ───
