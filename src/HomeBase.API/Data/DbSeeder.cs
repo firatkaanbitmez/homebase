@@ -154,7 +154,7 @@ public static class DbSeeder
     {
         new() { Name = "Stirling PDF", Description = "PDF duzenleme, birlestirme, bolme ve donusturme araci", Icon = "/icons/stirling-pdf.png", Color = "#e74c3c", ContainerName = "stirling-pdf", ComposeName = "stirling-pdf", SortOrder = 1 },
         new() { Name = "Glances", Description = "Sistem izleme - CPU, RAM, disk, ag ve Docker durumu", Icon = "/icons/glances.svg", Color = "#10b981", ContainerName = "glances", ComposeName = "glances", SortOrder = 2 },
-        new() { Name = "Nginx Proxy Manager", Description = "Reverse proxy yonetimi, SSL ve domain yonlendirme", Icon = "/icons/npm.png", Color = "#f15b2a", ContainerName = "nginx-proxy-manager", ComposeName = "nginx-proxy-manager", PreferPort = 81, SortOrder = 3 },
+        new() { Name = "Nginx Proxy Manager", Description = "Reverse proxy yonetimi, SSL ve domain yonlendirme", Icon = "/icons/nginx-proxy-manager.svg", Color = "#f15b2a", ContainerName = "nginx-proxy-manager", ComposeName = "nginx-proxy-manager", PreferPort = 81, SortOrder = 3 },
         new() { Name = "n8n", Description = "Is akisi otomasyonu - Zapier/IFTTT alternatifi", Icon = "/icons/n8n.png", Color = "#ea4b71", ContainerName = "n8n", ComposeName = "n8n", SortOrder = 4 },
         new() { Name = "IT-Tools", Description = "80+ gelistirici araci - hash, base64, regex, QR, JWT ve dahasi", Icon = "/icons/it-tools.ico", Color = "#5468ff", ContainerName = "it-tools", ComposeName = "it-tools", SortOrder = 5 },
         new() { Name = "FileBrowser", Description = "Web tabanli dosya yoneticisi - upload, download, paylasim", Icon = "/icons/filebrowser.svg", Color = "#3498db", ContainerName = "filebrowser", ComposeName = "filebrowser", SortOrder = 6 },

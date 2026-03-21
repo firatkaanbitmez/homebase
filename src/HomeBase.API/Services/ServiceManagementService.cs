@@ -205,7 +205,7 @@ public class ServiceManagementService
                 {
                     Name = FormatServiceName(def.ComposeName),
                     Description = "Auto-discovered from per-service compose",
-                    Icon = $"/icons/{def.ComposeName}.png",
+                    Icon = ResolveIconPath(def.ComposeName),
                     Color = GenerateColor(def.ComposeName),
                     ContainerName = containerName,
                     ServiceSlug = slug,
@@ -239,6 +239,8 @@ public class ServiceManagementService
                         existing.ComposeFilePath = _composeFile.GetRelativeComposeFilePath(slug);
                     }
                 }
+                if (string.IsNullOrEmpty(existing.ContainerName))
+                    existing.ContainerName = containerName;
                 existing.Image = def.Image ?? existing.Image;
                 existing.BuildContext = def.BuildContext ?? existing.BuildContext;
                 existing.EnvFile = def.EnvFiles.FirstOrDefault() ?? existing.EnvFile;
@@ -274,7 +276,7 @@ public class ServiceManagementService
                 {
                     Name = FormatServiceName(def.ComposeName),
                     Description = "Auto-discovered from docker-compose.yml",
-                    Icon = $"/icons/{def.ComposeName}.png",
+                    Icon = ResolveIconPath(def.ComposeName),
                     Color = GenerateColor(def.ComposeName),
                     ContainerName = containerName,
                     ServiceSlug = slug,
@@ -300,6 +302,8 @@ public class ServiceManagementService
                         existing.ServiceSlug = newSlug;
                 }
                 existing.ComposeName = def.ComposeName;
+                if (string.IsNullOrEmpty(existing.ContainerName))
+                    existing.ContainerName = containerName;
                 existing.Image = def.Image ?? existing.Image;
                 existing.BuildContext = def.BuildContext ?? existing.BuildContext;
                 existing.EnvFile = def.EnvFiles.FirstOrDefault() ?? existing.EnvFile;
@@ -372,6 +376,17 @@ public class ServiceManagementService
             .Where(s => s.Name == section || s.ComposeName == section)
             .Select(s => s.ComposeName)
             .FirstOrDefaultAsync();
+    }
+
+    private static string ResolveIconPath(string composeName)
+    {
+        var wwwroot = Path.Combine(AppContext.BaseDirectory, "wwwroot", "icons");
+        foreach (var ext in new[] { ".svg", ".png", ".ico" })
+        {
+            if (File.Exists(Path.Combine(wwwroot, composeName + ext)))
+                return $"/icons/{composeName}{ext}";
+        }
+        return $"/icons/{composeName}.png";
     }
 
     private static string FormatServiceName(string composeName)

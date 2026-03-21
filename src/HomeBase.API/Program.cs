@@ -202,6 +202,8 @@ async Task MigrateSingleService(
             {
                 svc.ServiceSlug = slug;
                 svc.ComposeFilePath = composeFile.GetRelativeComposeFilePath(slug);
+                if (string.IsNullOrEmpty(svc.ContainerName))
+                    svc.ContainerName = def.ContainerName ?? def.ComposeName;
             }
             return;
         }
@@ -223,6 +225,8 @@ async Task MigrateSingleService(
         {
             svc.ServiceSlug = slug;
             svc.ComposeFilePath = composeFile.GetRelativeComposeFilePath(slug);
+            if (string.IsNullOrEmpty(svc.ContainerName))
+                svc.ContainerName = def.ContainerName ?? def.ComposeName;
             svc.UpdatedAt = DateTime.UtcNow;
         }
 
