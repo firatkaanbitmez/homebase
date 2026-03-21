@@ -2,8 +2,6 @@
 
 <p align="center">
   Self-hosted home server dashboard for managing Docker services from a single web UI.
-  <br>
-  Deploy, monitor, configure — all in one place.
 </p>
 
 <p align="center">
@@ -13,49 +11,63 @@
   <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT License">
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/dashboard_dark.png" alt="Dashboard Dark" width="100%">
+</p>
+
 ---
 
 ## Features
 
-**Service Management**
-- Deploy, start, stop, restart, and remove containers from the UI
-- Real-time status updates via SignalR (WebSocket)
-- Grid and list view modes with live CPU/RAM metrics per container
+- Deploy, start, stop, restart containers from the UI
+- Real-time metrics via SignalR (CPU, RAM, disk, network, GPU)
+- Filter by status (online/offline), category, search, and sort (name/status/CPU/memory)
+- Grid and list view modes
+- Dark/light theme, TR/EN language support
+- Reverse proxy with port access control
+- Full audit log with filters
 
-**One-Click Deploy (4 Methods)**
-- **Docker Hub Search** — search and deploy any image instantly
-- **Recommended Catalog** — 35+ pre-configured services (Jellyfin, Grafana, Pi-hole, Ollama, n8n, etc.)
-- **AI Wizard** — point to any project folder, AI generates Dockerfile + Compose config
-- **Manual** — full control over image, ports, volumes, and environment
+### Deploy Methods
 
-**Smart Deploy Failure Handling**
-- Non-AI deploys (Docker Hub, Catalog, Manual) show container logs on failure with Refresh / Restart buttons
-- AI deploys get automatic chain-of-thought diagnosis: AI analyzes logs, fixes compose/Dockerfile, and retries
-- Optional "Diagnose with AI" button on non-AI failures when AI is configured
-- Input validation: empty names, missing images, duplicate ports, port conflicts, and long container names are all caught
+| Method | Description |
+|---|---|
+| **Docker Hub Search** | Search and deploy any image |
+| **Recommended Catalog** | 35+ pre-configured services |
+| **AI Wizard** | Point to a project folder, AI generates Dockerfile + Compose |
+| **Manual** | Full control over image, ports, volumes, env |
 
-**AI-Powered Deployment**
-- Automatic deploy diagnosis with multi-attempt fix loop
-- Multi-provider support: OpenAI, Gemini, Claude, or custom endpoint
+### AI-Powered Deploy
+
+- Multi-provider: OpenAI, Gemini, Claude, or custom endpoint
+- Automatic failure diagnosis with multi-attempt fix loop
 - Deploy chat: interact with AI to fix issues mid-deploy
 
-**Monitoring**
-- Live CPU, RAM, disk, network, and GPU usage
-- Per-container resource charts with configurable history
-- System health dashboard in Settings
+---
 
-**Configuration**
-- Per-service environment variables with port conflict detection
-- Configurable: AI tokens/attempts, compose timeout, stop timeout, chart history, GPU polling
-- Dark/light theme, TR/EN language support
+## Screenshots
 
-**Port Access Control**
-- Toggle ports between public and local-only access
-- Reverse proxy for local-only services accessed remotely
-
-**Audit Log**
-- Full history of all actions (start, stop, deploy, settings changes)
-- Filterable by action, target, and date range
+<div align="center">
+  <table>
+    <tr>
+      <td><img src="docs/screenshots/dashboard_dark.png" width="400" alt="Dashboard Dark"></td>
+      <td><img src="docs/screenshots/dashboard.png" width="400" alt="Dashboard Light"></td>
+      <td><img src="docs/screenshots/containers.png" width="400" alt="Containers"></td>
+      <td><img src="docs/screenshots/settings.png" width="400" alt="Settings"></td>
+      <td><img src="docs/screenshots/dockerhubsearch.png" width="400" alt="Docker Hub Search"></td>
+      <td><img src="docs/screenshots/addservice.png" width="400" alt="Add Service"></td>
+      <td><img src="docs/screenshots/aiwizard.png" width="400" alt="AI Wizard"></td>
+    </tr>
+    <tr>
+      <td align="center"><b>Dashboard (Dark)</b></td>
+      <td align="center"><b>Dashboard (Light)</b></td>
+      <td align="center"><b>Containers</b></td>
+      <td align="center"><b>Settings</b></td>
+      <td align="center"><b>Docker Hub Search</b></td>
+      <td align="center"><b>Add Service</b></td>
+      <td align="center"><b>AI Wizard</b></td>
+    </tr>
+  </table>
+</div>
 
 ---
 
@@ -74,21 +86,21 @@ Open **http://localhost:3000**
 ## Architecture
 
 ```
-Browser ──► ASP.NET Core 8 API ──► Docker Engine (via socket)
-                │                         │
-                ├── SignalR Hub            ├── Container lifecycle
-                ├── Static frontend       ├── Compose file management
-                └── EF Core ──► PostgreSQL └── AI service (OpenAI/Gemini/Claude)
+Browser --> ASP.NET Core 8 API --> Docker Engine (via socket)
+                |                         |
+                +-- SignalR Hub           +-- Container lifecycle
+                +-- Static frontend      +-- Compose file management
+                +-- EF Core --> Postgres  +-- AI service (multi-provider)
 ```
 
 | Layer | Tech |
 |---|---|
 | Backend | ASP.NET Core 8, Entity Framework Core |
 | Frontend | Vanilla HTML/CSS/JS (no framework) |
-| Database | PostgreSQL 16 (Alpine) |
+| Database | PostgreSQL 16 |
 | Real-time | SignalR WebSocket |
-| AI | OpenAI, Google Gemini, Anthropic Claude, Custom |
-| Container | Docker Engine API + Docker Compose CLI |
+| AI | OpenAI, Gemini, Claude, Custom |
+| Container | Docker Engine API + Compose CLI |
 
 ---
 
@@ -97,17 +109,15 @@ Browser ──► ASP.NET Core 8 API ──► Docker Engine (via socket)
 ```
 homebase/
 ├── src/HomeBase.API/
-│   ├── Controllers/       # REST API endpoints
-│   ├── Services/          # Docker, AI, Compose, Firewall, Settings
-│   ├── Data/              # DbContext, seeder, migrations
+│   ├── Controllers/       # REST API
+│   ├── Services/          # Docker, AI, Compose, Port Access
+│   ├── Data/              # DbContext, migrations
 │   ├── Models/            # Entities and DTOs
-│   ├── Hubs/              # SignalR real-time hub
-│   ├── Middleware/        # Error handling
-│   ├── wwwroot/           # Frontend (modular JS, CSS, icons)
-│   ├── Dockerfile         # Multi-stage build
-│   └── Program.cs         # Entry point
-├── services/              # Per-service compose files (auto-generated)
-├── docker-compose.yml     # PostgreSQL + Dashboard
+│   ├── Hubs/              # SignalR hub
+│   ├── wwwroot/           # Frontend (modular JS, CSS)
+│   └── Dockerfile
+├── services/              # Per-service compose files
+├── docker-compose.yml     # Postgres + Dashboard
 └── LICENSE
 ```
 
@@ -115,17 +125,15 @@ homebase/
 
 ## Configuration
 
-Default settings work out of the box. All settings are configurable from the UI (Settings page).
+All settings are configurable from the Settings page.
 
 | Setting | Default | Description |
 |---|---|---|
 | `DASHBOARD_PORT` | `3000` | Web UI port |
-| `POSTGRES_PASSWORD` | `pass123` | Database password |
-| AI Provider | — | OpenAI / Gemini / Claude / Custom (set in Settings) |
-| AI Max Tokens | `4000` | AI response token limit |
+| AI Provider | — | OpenAI / Gemini / Claude / Custom |
+| AI Max Tokens | `4000` | Response token limit |
 | AI Max Attempts | `3` | Auto-fix retry count |
 | Compose Timeout | `120s` | Compose operation timeout |
-| Container Stop Timeout | `10s` | Graceful shutdown timeout |
 | Chart History | `60` | Dashboard chart data points |
 | GPU Poll Interval | `10s` | GPU info refresh rate |
 
@@ -135,10 +143,10 @@ Default settings work out of the box. All settings are configurable from the UI 
 
 | Key | Action |
 |---|---|
-| `1` `2` `3` `4` | Switch views (Dashboard, Containers, Audit, Settings) |
+| `1` `2` `3` `4` | Switch views |
 | `/` | Focus search |
 | `n` | Open deploy wizard |
-| `r` | Refresh data |
+| `r` | Refresh |
 | `t` | Toggle theme |
 | `Esc` | Close modals |
 
