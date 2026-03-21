@@ -152,9 +152,9 @@ body {
 .svc-card.stopped{filter:grayscale(.3) brightness(.7);transition:all var(--transition)}
 .svc-card.stopped:hover{filter:grayscale(.1) brightness(.9)}
 .svc-accent{height:3px}
-.svc-body{padding:1.1rem 1.25rem;display:flex;align-items:flex-start;gap:.85rem;text-decoration:none;color:inherit;cursor:pointer}
+.svc-body{padding:1.1rem 1.25rem;display:flex;align-items:flex-start;gap:.85rem;text-decoration:none;color:inherit;cursor:pointer;flex:1}
 .svc-logo{width:42px;height:42px;border-radius:10px;object-fit:contain;flex-shrink:0;background:var(--bg-3);padding:5px}
-.svc-info{flex:1;min-width:0}
+.svc-info{flex:1;min-width:0;display:flex;flex-direction:column}
 .svc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.2rem}
 .svc-name{font-size:.95rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .badge{display:inline-flex;align-items:center;gap:.3rem;font-size:.55rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:.15rem .45rem;border-radius:20px}
@@ -162,8 +162,8 @@ body {
 .badge.down{background:var(--red-bg);color:var(--red)}
 .badge.exited{background:var(--yellow-bg);color:var(--yellow)}
 .badge-dot{width:4px;height:4px;border-radius:50%;background:currentColor}
-.svc-desc{font-size:.75rem;color:var(--text-m);line-height:1.4;margin-bottom:.6rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.svc-metrics{display:flex;gap:1rem;padding-top:.6rem;border-top:1px solid var(--border)}
+.svc-desc{font-size:.75rem;color:var(--text-m);line-height:1.4;margin-bottom:.6rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;flex:1}
+.svc-metrics{display:flex;gap:1rem;padding-top:.6rem;border-top:1px solid var(--border);margin-top:auto}
 .metric{display:flex;flex-direction:column;gap:1px}
 .metric-lbl{font-size:.55rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-m)}
 .metric-val{font-size:.8rem;font-weight:600;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:.35rem}
@@ -200,24 +200,33 @@ body {
 .toggle.on::after{transform:translateX(14px)}
 
 /* ─ Card footer action buttons (single source) ─ */
-.svc-foot-actions{display:flex;gap:4px;opacity:0;transition:opacity .15s}
-.svc-card:hover .svc-foot-actions{opacity:1}
-.svc-grid.list-mode .svc-foot-actions{opacity:1}
+.svc-foot-actions{display:flex;gap:4px}
 .svc-action-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:var(--bg-2);color:var(--text-m);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
 .svc-action-btn:hover{background:var(--bg-4);color:var(--text);border-color:var(--border-l)}
 .svc-action-btn.danger:hover{background:var(--red-bg);color:var(--red);border-color:var(--red)}
 
 /* ─ List Mode Overrides ─ */
+.svc-grid.list-mode{gap:.45rem}
 .svc-grid.list-mode .svc-card{flex-direction:row;align-items:center}
 .svc-grid.list-mode .svc-accent{width:3px;height:auto;min-height:100%;align-self:stretch}
-.svc-grid.list-mode .svc-body{flex:1;padding:.7rem 1rem;align-items:center}
-.svc-grid.list-mode .svc-logo{width:34px;height:34px;padding:4px}
-.svc-grid.list-mode .svc-info{display:flex;align-items:center;gap:1rem}
+.svc-grid.list-mode .svc-body{flex:1;padding:.45rem .9rem;align-items:center;gap:.7rem}
+.svc-grid.list-mode .svc-logo{width:28px;height:28px;padding:3px;border-radius:6px}
+.svc-grid.list-mode .svc-info{display:flex;flex-direction:row;align-items:center;gap:1.1rem;width:100%}
 .svc-grid.list-mode .svc-head{margin-bottom:0;flex-shrink:0;min-width:160px}
+.svc-grid.list-mode .svc-name{font-size:.88rem}
 .svc-grid.list-mode .svc-desc{display:none}
-.svc-grid.list-mode .svc-metrics{border-top:none;padding-top:0;flex:1}
-.svc-grid.list-mode .svc-foot{border-top:none;border-left:1px solid var(--border);padding:.7rem 1rem;background:transparent;flex-shrink:0}
-.svc-grid.list-mode .svc-foot{gap:.5rem;align-items:center}
+.svc-grid.list-mode .svc-metrics{border-top:none;padding-top:0;margin-top:0;flex:1;gap:1rem}
+.svc-grid.list-mode .metric{flex-direction:row;align-items:center;gap:.35rem}
+.svc-grid.list-mode .metric-lbl{font-size:.58rem}
+.svc-grid.list-mode .metric-val{font-size:.8rem}
+.svc-grid.list-mode .bar{width:40px}
+.svc-grid.list-mode .svc-foot{border-top:none;border-left:1px solid var(--border);padding:.45rem .9rem;background:transparent;flex-shrink:0;gap:.5rem;align-items:center}
+.svc-grid.list-mode .svc-action-btn{width:26px;height:26px;border-radius:5px}
+.svc-grid.list-mode .svc-action-btn svg{width:13px;height:13px}
+.svc-grid.list-mode .toggle{width:30px;height:17px;border-radius:9px}
+.svc-grid.list-mode .toggle::after{width:13px;height:13px}
+.svc-grid.list-mode .toggle.on::after{transform:translateX(13px)}
+.svc-grid.list-mode .toggle-lbl{font-size:.63rem}
 
 /* ═══ Containers Table ═══ */
 .tbl-wrap{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r);overflow-x:auto}

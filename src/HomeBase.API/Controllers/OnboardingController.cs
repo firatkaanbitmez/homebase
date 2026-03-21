@@ -49,7 +49,7 @@ public class OnboardingController : ControllerBase
     private string ProjectDir => _config["Paths:ProjectDir"] ?? "/app/project";
 
     [HttpGet("search")]
-    public async Task<IActionResult> SearchDockerHub([FromQuery] string q, [FromQuery] int limit = 25)
+    public async Task<IActionResult> SearchDockerHub([FromQuery] string? q, [FromQuery] int limit = 25)
     {
         if (string.IsNullOrWhiteSpace(q)) return Ok(Array.Empty<object>());
         var results = await _dockerHub.SearchAsync(q, limit);
@@ -100,8 +100,18 @@ public class OnboardingController : ControllerBase
     {
         try
         {
+            // Validate required fields
+            if (string.IsNullOrWhiteSpace(request.Name))
+                return Ok(new DeployResponse(false, null, "Service name is required"));
+            if (string.IsNullOrWhiteSpace(request.Image) && string.IsNullOrWhiteSpace(request.BuildContext))
+                return Ok(new DeployResponse(false, null, "Either an image or build context is required"));
+
             var composeName = request.ComposeName ?? request.Name.ToLower().Replace(" ", "-")
                 .Replace("--", "-").Trim('-');
+
+            // Truncate container name to Docker's 63-character limit
+            if (composeName.Length > 63)
+                composeName = composeName.Substring(0, 63).TrimEnd('-');
 
             // 1. Generate unique slug
             var slug = _composeFile.GenerateUniqueSlug(composeName);
@@ -130,6 +140,10 @@ public class OnboardingController : ControllerBase
                             return Ok(new DeployResponse(false, null, $"'{portVal}' is not a valid port"));
                         containerPort = hostPort;
                     }
+
+                    // Check for duplicate host ports within this request
+                    if (parsedPorts.Values.Any(p => p.Host == hostPort))
+                        return Ok(new DeployResponse(false, null, $"Host port {hostPort} is specified more than once"));
 
                     var (valid, error) = await _settings.ValidateNewServicePortAsync(hostPort, request.Name);
                     if (!valid)

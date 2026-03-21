@@ -88,6 +88,19 @@ public class ComposeFileService
         sb.AppendLine("    networks:");
         sb.AppendLine("      - homebase");
 
+        // Top-level named volumes (volumes that don't start with ./ or / are named)
+        var namedVolumes = def.Volumes
+            .Select(v => v.Split(':')[0])
+            .Where(v => !v.StartsWith("./") && !v.StartsWith("../") && !v.StartsWith("/") && !Path.IsPathRooted(v))
+            .ToList();
+        if (namedVolumes.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("volumes:");
+            foreach (var vol in namedVolumes)
+                sb.AppendLine($"  {vol}:");
+        }
+
         sb.AppendLine();
         sb.AppendLine("networks:");
         sb.AppendLine("  homebase:");

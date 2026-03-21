@@ -142,8 +142,8 @@ function showExpandedChart(label, data, color) {
 // ─── Smart Render Services (no flicker) ───
 function buildCardHtml(svc) {
     const c = getCtr(svc), up = c?.state === 'running';
-    const deploying = svc.deployStatus === 'deploying';
-    const deployFailed = svc.deployStatus === 'failed';
+    const deploying = svc.deployStatus === 'deploying' && !up;
+    const deployFailed = svc.deployStatus === 'failed' && !up;
     const url = getSvcUrl(svc, c);
     const noUrl = url === null;
     const isProxied = url && url.startsWith('/api/proxy/');
@@ -163,7 +163,7 @@ function buildCardHtml(svc) {
             <img class="svc-logo" src="${svc.icon}" alt="" onerror="this.style.display='none'">
             <div class="svc-info">
                 <div class="svc-head">
-                    <span class="svc-name">${escHtml(svc.name)}${catBadge}${isProxied ? '<span class="proxy-badge" title="Local access (via proxy)">🔒</span>' : ''}</span>
+                    <span class="svc-name">${escHtml(svc.name)}${catBadge}${isProxied ? `<span class="proxy-badge" title="${t('misc.localAccess')}">🔒</span>` : ''}</span>
                     ${deploying
                         ? `<span class="badge transition" style="animation:pulse 1.5s ease-in-out infinite"><span class="spinner"></span>${t('status.deploying')}</span>`
                         : deployFailed

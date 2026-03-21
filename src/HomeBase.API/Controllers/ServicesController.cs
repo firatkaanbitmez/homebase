@@ -1,3 +1,4 @@
+using HomeBase.API.Data;
 using HomeBase.API.Hubs;
 using HomeBase.API.Models;
 using HomeBase.API.Services;
@@ -15,17 +16,21 @@ public class ServicesController : ControllerBase
     private readonly ComposeParserService _composeParser;
     private readonly ComposeFileService _composeFile;
     private readonly AiService _aiService;
+    private readonly DockerService _docker;
+    private readonly AppDbContext _db;
     private readonly IHubContext<DashboardHub> _hub;
     private readonly ILogger<ServicesController> _logger;
 
     public ServicesController(ServiceManagementService svcMgmt, ComposeParserService composeParser,
-        ComposeFileService composeFile, AiService aiService,
+        ComposeFileService composeFile, AiService aiService, DockerService docker, AppDbContext db,
         IHubContext<DashboardHub> hub, ILogger<ServicesController> logger)
     {
         _svcMgmt = svcMgmt;
         _composeParser = composeParser;
         _composeFile = composeFile;
         _aiService = aiService;
+        _docker = docker;
+        _db = db;
         _hub = hub;
         _logger = logger;
     }
@@ -34,6 +39,31 @@ public class ServicesController : ControllerBase
     public async Task<IActionResult> GetAll()
     {
         var services = await _svcMgmt.GetAllAsync();
+
+        // Clear stale DeployStatus for services whose containers are now running
+        var stale = services.Where(s => s.DeployStatus != null && s.ContainerName != null).ToList();
+        if (stale.Any())
+        {
+            try
+            {
+                var containers = await _docker.GetContainersAsync();
+                var runningNames = containers.Where(c => c.State == "running")
+                    .Select(c => c.Name).ToHashSet();
+
+                var cleared = false;
+                foreach (var s in stale)
+                {
+                    if (runningNames.Contains(s.ContainerName!))
+                    {
+                        s.DeployStatus = null;
+                        cleared = true;
+                    }
+                }
+                if (cleared) await _db.SaveChangesAsync();
+            }
+            catch { /* non-critical */ }
+        }
+
         var response = services.Select(s => new ServiceResponse(
             s.Id, s.Name, s.Description, s.Icon, s.Color,
             s.ContainerName, s.PreferPort, s.UrlPath, s.IsEnabled,
