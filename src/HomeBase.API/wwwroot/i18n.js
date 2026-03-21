@@ -95,6 +95,8 @@ const LANG = {
     'empty.firstDeploy':'İlk servisinizi deploy edin',
     'empty.firstDeployDesc':"Docker Hub'dan arayın, katalogdan seçin veya manuel olarak yapılandırın.",
     'empty.noMatch':'Aramanızla eşleşen servis bulunamadı','empty.clearSearch':'Aramayı Temizle',
+    'filter.all':'Tümü','filter.online':'Çevrimiçi','filter.offline':'Çevrimdışı','filter.clearAll':'Filtreleri Temizle',
+    'filter.sortName':'Ad','filter.sortStatus':'Durum','filter.sortCpu':'CPU Kullanımı','filter.sortMem':'Bellek',
     'empty.noSettings':'Ayar bulunamadı. Servisleri yapılandırdıktan sonra ayarlar burada görünecek.',
     'empty.noMatchSettings':'ile eşleşen ayar bulunamadı',
     // Search
@@ -338,6 +340,8 @@ const LANG = {
     'empty.firstDeploy':'Deploy your first service',
     'empty.firstDeployDesc':'Search Docker Hub, pick from catalog, or configure manually.',
     'empty.noMatch':'No services match your search','empty.clearSearch':'Clear Search',
+    'filter.all':'All','filter.online':'Online','filter.offline':'Offline','filter.clearAll':'Clear Filters',
+    'filter.sortName':'Name','filter.sortStatus':'Status','filter.sortCpu':'CPU Usage','filter.sortMem':'Memory',
     'empty.noSettings':'No settings found. Settings will appear here after configuring services.',
     'empty.noMatchSettings':'No settings match',
     // Search

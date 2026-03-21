@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HomeBase</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'><defs><linearGradient id='g' x1='0' y1='0' x2='32' y2='32' gradientUnits='userSpaceOnUse'><stop stop-color='%236366f1'/><stop offset='1' stop-color='%23a78bfa'/></linearGradient></defs><path d='M16 2L28 9v14l-12 7L4 23V9l12-7z' stroke='url(%23g)' stroke-width='1.5' fill='none'/><path d='M16 10l-6 4v6l6 4 6-4v-6l-6-4z' stroke='url(%23g)' stroke-width='1.5' fill='none'/><path d='M10 14l6 4 6-4M16 18v6' stroke='url(%23g)' stroke-width='1.5'/></svg>">
-    <link rel="stylesheet" href="style.css?v=14">
+    <link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
     <div class="app">
@@ -90,24 +90,55 @@
                     </div>
                 </div>
 
-                <div class="section-bar">
-                    <h2 data-i18n="section.services">Services</h2>
-                    <div class="search-box">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                        <input type="text" id="searchInput" data-i18n-placeholder="search.placeholder" placeholder="Search services..." autocomplete="off">
-                    </div>
-
-                    <button class="section-btn primary" onclick="openOnboardingWizard()" title="Add Service (N)">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                        <span data-i18n="misc.addService">Add Service</span>
-                    </button>
-                    <div class="view-toggle" id="viewToggle">
-                        <button class="vt-btn active" data-mode="grid" title="Card View">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                        </button>
-                        <button class="vt-btn" data-mode="list" title="List View">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6" stroke-width="3" stroke-linecap="round"/><line x1="3" y1="12" x2="3.01" y2="12" stroke-width="3" stroke-linecap="round"/><line x1="3" y1="18" x2="3.01" y2="18" stroke-width="3" stroke-linecap="round"/></svg>
-                        </button>
+                <div class="toolbar-wrap">
+                    <div class="toolbar-row">
+                        <div class="toolbar-left">
+                            <div class="search-box enhanced" id="searchBox">
+                                <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                <input type="text" id="searchInput" data-i18n-placeholder="search.placeholder" placeholder="Search services..." autocomplete="off">
+                                <span class="search-count" id="searchCount"></span>
+                                <button class="search-clear" id="searchClear" style="display:none" title="Clear">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                </button>
+                                <span class="search-kbd">/</span>
+                            </div>
+                            <div class="filter-pills" id="statusFilters">
+                                <button class="filter-pill active" data-status="all" data-i18n="filter.all">All</button>
+                                <button class="filter-pill" data-status="online">
+                                    <span class="filter-dot online"></span><span data-i18n="filter.online">Online</span>
+                                </button>
+                                <button class="filter-pill" data-status="offline">
+                                    <span class="filter-dot offline"></span><span data-i18n="filter.offline">Offline</span>
+                                </button>
+                            </div>
+                            <div class="filter-sep"></div>
+                            <div class="filter-pills" id="categoryFilters"></div>
+                        </div>
+                        <div class="toolbar-right">
+                            <div class="sort-dropdown" id="sortDropdown">
+                                <button class="sort-btn" id="sortBtn" title="Sort">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5h10M11 9h7M11 13h4"/><path d="M3 17l3 3 3-3M6 18V4"/></svg>
+                                </button>
+                                <div class="sort-menu" id="sortMenu">
+                                    <button class="sort-option active" data-sort="name" data-i18n="filter.sortName">Name</button>
+                                    <button class="sort-option" data-sort="status" data-i18n="filter.sortStatus">Status</button>
+                                    <button class="sort-option" data-sort="cpu" data-i18n="filter.sortCpu">CPU Usage</button>
+                                    <button class="sort-option" data-sort="mem" data-i18n="filter.sortMem">Memory</button>
+                                </div>
+                            </div>
+                            <div class="view-toggle" id="viewToggle">
+                                <button class="vt-btn active" data-mode="grid" title="Card View">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                                </button>
+                                <button class="vt-btn" data-mode="list" title="List View">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6" stroke-width="3" stroke-linecap="round"/><line x1="3" y1="12" x2="3.01" y2="12" stroke-width="3" stroke-linecap="round"/><line x1="3" y1="18" x2="3.01" y2="18" stroke-width="3" stroke-linecap="round"/></svg>
+                                </button>
+                            </div>
+                            <button class="section-btn primary" onclick="openOnboardingWizard()" title="Add Service (N)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                <span data-i18n="misc.addService">Add Service</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div id="servicesGrid" class="svc-grid"></div>
@@ -220,16 +251,16 @@
 
     <div id="modalRoot"></div>
     <script src="lib/signalr.min.js"></script>
-    <script src="utils.js?v=14"></script>
-    <script src="i18n.js?v=14"></script>
-    <script src="ui.js?v=14"></script>
-    <script src="state.js?v=14"></script>
-    <script src="render.js?v=14"></script>
-    <script src="containers.js?v=14"></script>
-    <script src="settings.js?v=14"></script>
-    <script src="wizard.js?v=14"></script>
-    <script src="editor.js?v=14"></script>
-    <script src="audit.js?v=14"></script>
-    <script src="app.js?v=14"></script>
+    <script src="utils.js?v=15"></script>
+    <script src="i18n.js?v=15"></script>
+    <script src="ui.js?v=15"></script>
+    <script src="state.js?v=15"></script>
+    <script src="render.js?v=15"></script>
+    <script src="containers.js?v=15"></script>
+    <script src="settings.js?v=15"></script>
+    <script src="wizard.js?v=15"></script>
+    <script src="editor.js?v=15"></script>
+    <script src="audit.js?v=15"></script>
+    <script src="app.js?v=15"></script>
 </body>
 </html>

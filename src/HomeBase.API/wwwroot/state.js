@@ -9,6 +9,9 @@ let viewMode = localStorage.getItem('viewMode') || 'grid';
 const transitioning = new Set();
 const deletingServiceIds = new Set(); // guard for delete race condition
 let searchQuery = '';
+let statusFilter = 'all';     // 'all' | 'online' | 'offline'
+let categoryFilter = '';       // '' = all, or category name
+let sortMode = localStorage.getItem('sortMode') || 'name';
 let initialLoad = true;
 let consecutiveErrors = 0;
 let pollInterval = parseInt(localStorage.getItem('pollInterval')) || 5000;

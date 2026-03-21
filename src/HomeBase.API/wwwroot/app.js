@@ -45,11 +45,72 @@ function setViewMode(mode) {
 $$('.vt-btn').forEach(b => b.addEventListener('click', () => setViewMode(b.dataset.mode)));
 setViewMode(viewMode);
 
-// ─── Search ───
-$('#searchInput').addEventListener('input', e => {
+// ─── Search (enhanced) ───
+const _searchInput = $('#searchInput');
+const _searchClear = $('#searchClear');
+const _searchKbd = document.querySelector('.search-kbd');
+
+_searchInput.addEventListener('input', e => {
     searchQuery = e.target.value.toLowerCase().trim();
+    _searchClear.style.display = searchQuery ? 'flex' : 'none';
+    if (_searchKbd) _searchKbd.style.display = searchQuery ? 'none' : '';
     renderServices();
 });
+
+_searchClear.addEventListener('click', () => {
+    _searchInput.value = '';
+    searchQuery = '';
+    _searchClear.style.display = 'none';
+    if (_searchKbd) _searchKbd.style.display = '';
+    _searchInput.focus();
+    renderServices();
+});
+
+// ─── Status Filters ───
+$$('#statusFilters .filter-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+        statusFilter = btn.dataset.status;
+        $$('#statusFilters .filter-pill').forEach(b => b.classList.toggle('active', b.dataset.status === statusFilter));
+        renderServices();
+    });
+});
+
+// ─── Sort ───
+const _sortBtn = $('#sortBtn');
+const _sortMenu = $('#sortMenu');
+
+_sortBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    _sortMenu.classList.toggle('open');
+});
+
+document.addEventListener('click', () => _sortMenu.classList.remove('open'));
+
+$$('.sort-option').forEach(opt => {
+    opt.addEventListener('click', e => {
+        e.stopPropagation();
+        sortMode = opt.dataset.sort;
+        localStorage.setItem('sortMode', sortMode);
+        $$('.sort-option').forEach(o => o.classList.toggle('active', o.dataset.sort === sortMode));
+        _sortMenu.classList.remove('open');
+        renderServices();
+    });
+});
+
+// Restore sort mode on load
+$$('.sort-option').forEach(o => o.classList.toggle('active', o.dataset.sort === sortMode));
+
+// ─── Clear All Filters ───
+function clearAllFilters() {
+    _searchInput.value = '';
+    searchQuery = '';
+    statusFilter = 'all';
+    categoryFilter = '';
+    _searchClear.style.display = 'none';
+    if (_searchKbd) _searchKbd.style.display = '';
+    $$('#statusFilters .filter-pill').forEach(b => b.classList.toggle('active', b.dataset.status === 'all'));
+    renderServices();
+}
 
 // ─── Clock ───
 const updateClock = () => $('#clock').textContent = new Date().toLocaleTimeString(currentLang === 'en' ? 'en-US' : 'tr-TR');

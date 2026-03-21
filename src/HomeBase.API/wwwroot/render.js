@@ -215,12 +215,93 @@ const HOMEBASE_CONTAINERS = new Set(['homebase-api', 'homebase-db']);
 const CAT_I18N_MAP = { 'Media':'cat.media','Development':'cat.development','Monitoring':'cat.monitoring','Productivity':'cat.productivity','Security':'cat.security','AI/ML':'cat.ai_ml','Storage':'cat.storage','Networking':'cat.networking' };
 function tCat(name) { return CAT_I18N_MAP[name] ? t(CAT_I18N_MAP[name]) : name; }
 
+function buildCategoryFilters() {
+    const el = $('#categoryFilters');
+    if (!el) return;
+    const visible = services.filter(s => !HOMEBASE_CONTAINERS.has(s.containerName));
+    const cats = {};
+    visible.forEach(s => { if (s.category) cats[s.category] = (cats[s.category]||0) + 1; });
+    const sorted = Object.entries(cats).sort((a,b) => a[0].localeCompare(b[0]));
+    if (sorted.length === 0) { el.innerHTML = ''; return; }
+    el.innerHTML = sorted.map(([cat, count]) =>
+        `<button class="filter-pill${categoryFilter === cat ? ' active' : ''}" data-cat="${escHtml(cat)}">
+            ${escHtml(tCat(cat))}<span class="filter-count">${count}</span>
+        </button>`
+    ).join('');
+    el.querySelectorAll('.filter-pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+            categoryFilter = categoryFilter === btn.dataset.cat ? '' : btn.dataset.cat;
+            el.querySelectorAll('.filter-pill').forEach(b => b.classList.toggle('active', b.dataset.cat === categoryFilter));
+            renderServices();
+        });
+    });
+}
+
+function updateStatusFilterCounts() {
+    const visible = services.filter(s => !HOMEBASE_CONTAINERS.has(s.containerName));
+    const onlineCount = visible.filter(s => getCtr(s)?.state === 'running').length;
+    const offlineCount = visible.length - onlineCount;
+    const pills = $$('#statusFilters .filter-pill');
+    pills.forEach(pill => {
+        const s = pill.dataset.status;
+        const existing = pill.querySelector('.filter-count');
+        const count = s === 'all' ? visible.length : s === 'online' ? onlineCount : offlineCount;
+        if (existing) existing.textContent = count;
+        else {
+            const span = document.createElement('span');
+            span.className = 'filter-count';
+            span.textContent = count;
+            pill.appendChild(span);
+        }
+    });
+}
+
+function sortServices(arr) {
+    return [...arr].sort((a, b) => {
+        const ca = getCtr(a), cb = getCtr(b);
+        switch (sortMode) {
+            case 'status': {
+                const sa = ca?.state === 'running' ? 0 : 1;
+                const sb = cb?.state === 'running' ? 0 : 1;
+                return sa - sb || a.name.localeCompare(b.name);
+            }
+            case 'cpu': {
+                const cpuA = parseFloat(ca?.stats?.cpu || 0);
+                const cpuB = parseFloat(cb?.stats?.cpu || 0);
+                return cpuB - cpuA;
+            }
+            case 'mem': {
+                const memA = parseInt(ca?.stats?.memMB || 0);
+                const memB = parseInt(cb?.stats?.memMB || 0);
+                return memB - memA;
+            }
+            default: return a.name.localeCompare(b.name);
+        }
+    });
+}
+
 function renderServices() {
     const g = $('#servicesGrid');
     const filtered = services.filter(svc => {
         if (HOMEBASE_CONTAINERS.has(svc.containerName)) return false;
-        return !searchQuery || svc.name.toLowerCase().includes(searchQuery) || (svc.description||'').toLowerCase().includes(searchQuery);
+        if (searchQuery && !svc.name.toLowerCase().includes(searchQuery) && !(svc.description||'').toLowerCase().includes(searchQuery)) return false;
+        if (statusFilter === 'online' && getCtr(svc)?.state !== 'running') return false;
+        if (statusFilter === 'offline' && getCtr(svc)?.state === 'running') return false;
+        if (categoryFilter && svc.category !== categoryFilter) return false;
+        return true;
     });
+    const sorted = sortServices(filtered);
+
+    // Update filter UI
+    updateStatusFilterCounts();
+    buildCategoryFilters();
+
+    // Search count
+    const countEl = $('#searchCount');
+    if (countEl) {
+        if (searchQuery) countEl.textContent = sorted.length + '';
+        else countEl.textContent = '';
+    }
 
     // Force clear non-card elements (empty states, errors) before re-render
     g.querySelectorAll('.empty-state, .error-state').forEach(el => el.remove());
@@ -238,11 +319,12 @@ function renderServices() {
         </div>`;
         return;
     }
-    if (!initialLoad && filtered.length === 0 && searchQuery) {
+    const hasActiveFilters = searchQuery || statusFilter !== 'all' || categoryFilter;
+    if (!initialLoad && sorted.length === 0 && hasActiveFilters) {
         g.innerHTML = `<div class="empty-state">
             <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <div class="empty-state-msg">${t('empty.noMatch')}</div>
-            <button class="empty-state-action" onclick="document.getElementById('searchInput').value='';searchQuery='';renderServices();">${t('empty.clearSearch')}</button>
+            <button class="empty-state-action" onclick="clearAllFilters()">${t('filter.clearAll')}</button>
         </div>`;
         return;
     }
@@ -255,7 +337,7 @@ function renderServices() {
     const existingMap = {};
     existingCards.forEach(card => { existingMap[card.dataset.name] = card; });
 
-    const newNames = new Set(filtered.map(s => s.containerName));
+    const newNames = new Set(sorted.map(s => s.containerName));
 
     // Remove cards that are no longer in the list
     existingCards.forEach(card => {
@@ -264,7 +346,7 @@ function renderServices() {
 
     // Update or create cards in order
     let prevCard = null;
-    for (const svc of filtered) {
+    for (const svc of sorted) {
         const c = getCtr(svc), up = c?.state === 'running';
         const busy = transitioning.has(svc.containerName);
         const stopping = busy && up;
@@ -290,6 +372,12 @@ function renderServices() {
                 card.className = `svc-card ${up && !stopping ? '' : 'stopped'} ${busy ? 'busy' : ''}`;
                 card.innerHTML = buildCardHtml(svc);
                 card.dataset.stateHash = stateHash;
+            }
+            // Ensure correct DOM order
+            const expectedAfter = prevCard ? prevCard.nextSibling : g.firstChild;
+            if (card !== expectedAfter) {
+                if (prevCard) prevCard.insertAdjacentElement('afterend', card);
+                else g.prepend(card);
             }
         }
         prevCard = card;
