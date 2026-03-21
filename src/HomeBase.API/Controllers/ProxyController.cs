@@ -1,5 +1,7 @@
+using HomeBase.API.Data;
 using HomeBase.API.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace HomeBase.API.Controllers;
 
@@ -10,14 +12,16 @@ public class ProxyController : ControllerBase
     private readonly IHttpClientFactory _httpFactory;
     private readonly DockerService _docker;
     private readonly DockerCacheService _cache;
+    private readonly AppDbContext _db;
     private readonly ILogger<ProxyController> _logger;
 
     public ProxyController(IHttpClientFactory httpFactory, DockerService docker,
-        DockerCacheService cache, ILogger<ProxyController> logger)
+        DockerCacheService cache, AppDbContext db, ILogger<ProxyController> logger)
     {
         _httpFactory = httpFactory;
         _docker = docker;
         _cache = cache;
+        _db = db;
         _logger = logger;
     }
 
@@ -29,6 +33,12 @@ public class ProxyController : ControllerBase
     {
         if (port < 1 || port > 65535)
             return BadRequest("Invalid port");
+
+        // Check if port access is blocked (IsExternal=false means proxy access denied)
+        var rule = await _db.PortAccessRules
+            .FirstOrDefaultAsync(r => r.Port == port && r.Protocol == "TCP" && r.IsActive);
+        if (rule != null && !rule.IsExternal)
+            return StatusCode(403, $"Port {port} access is disabled");
 
         // Find the container that has this host port mapped,
         // then resolve its internal IP + container port for proxying
