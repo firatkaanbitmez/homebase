@@ -13,8 +13,8 @@ const LANG = {
     'msg.restartFail':'restart başarısız','msg.connectFail':'Sunucuya bağlanılamadı. Bağlantınızı kontrol edin.',
     'msg.connectionIssues':'Bağlantı sorunları yaşanıyor. Yenileme hızı düşürüldü.',
     'msg.refreshing':'Yenileniyor...','msg.retry':'Tekrar Dene',
-    'msg.deployOk':'başarıyla deploy edildi','msg.deployFail':'Deploy hatası',
-    'msg.deploying':'deploy ediliyor...','msg.saved':'kaydedildi','msg.saveFail':'kaydedilemedi',
+    'msg.deployOk':'başarıyla yayınlandı','msg.deployFail':'Yayınlama hatası',
+    'msg.deploying':'yayınlanıyor...','msg.saved':'kaydedildi','msg.saveFail':'kaydedilemedi',
     'msg.settingsSaved':'Ayarlar kaydedildi','msg.settingsSavedRestart':'Ayarlar kaydedildi, container yeniden başlatılıyor...',
     'msg.settingsSaveWarn':'Kaydedildi ancak container yeniden başlatılamadı',
     'msg.settingsFail':'Ayarlar yüklenemedi','msg.logFail':'Log alınamadı','msg.logEmpty':'Log bulunamadı.',
@@ -40,7 +40,7 @@ const LANG = {
     'confirm.deleteMsg':'servisini silmek istediğinize emin misiniz?',
     'confirm.deleteDetail':'Bu servis tamamen kaldırılacak: container durdurulup silinecek, compose tanımı ve ayarlar temizlenecek. Proje dosyalarına dokunulmaz.',
     'msg.deleting':'siliniyor...','msg.deleteStep.removing':'Servis siliniyor...','msg.deleteStep.done':'Tamamlandı',
-    'confirm.deploy':'Deploy','confirm.deployMsg':'servisini deploy etmek istiyor musunuz?',
+    'confirm.deploy':'Yayınla','confirm.deployMsg':'servisini yayınlamak istiyor musunuz?',
     // Card
     'card.on':'Açık','card.off':'Kapalı',
     // Settings
@@ -60,22 +60,22 @@ const LANG = {
     'settings.composeTimeout':'Compose Zaman Aşımı','settings.stopTimeout':'Durdurma Süresi',
     'settings.chartHistory':'Grafik Geçmişi','settings.gpuPolling':'GPU Yenileme',
     'settings.docker':'Docker',
-    'misc.deployBtn':'Deploy →','misc.official':'Resmi','misc.localAccess':'Yerel erişim (proxy)',
+    'misc.deployBtn':'Yayınla →','misc.official':'Resmi','misc.localAccess':'Yerel erişim (proxy)',
     // Port Toggle
     'port.all':'Herkese Açık','port.local':'Yerel',
     // Wizard
     'wizard.title':'Servis Ekle','wizard.dockerhub':'Docker Hub Ara','wizard.recommended':'Önerilen','wizard.manual':'Manuel',
     'wizard.step1':'Temel','wizard.step2':'Ağ','wizard.step3':'Depolama & Ortam','wizard.step4':'Önizleme',
-    'wizard.name':'Servis Adı','wizard.image':'Docker Image','wizard.desc':'Açıklama','wizard.icon':'İkon',
+    'wizard.name':'Servis Adı','wizard.image':'Docker İmajı','wizard.desc':'Açıklama','wizard.icon':'İkon',
     'wizard.color':'Renk','wizard.ports':'Port Eşleme','wizard.volumes':'Birimler','wizard.env':'Ortam Değişkenleri',
     'wizard.restartPolicy':'Yeniden Başlatma Politikası','wizard.addPort':'+ Port Ekle','wizard.addVolume':'+ Birim Ekle','wizard.addEnv':'+ Değişken Ekle',
-    'wizard.next':'İleri','wizard.back':'Geri','wizard.deploy':'Deploy','wizard.deployProgress':'Deploy ediliyor...',
+    'wizard.next':'İleri','wizard.back':'Geri','wizard.deploy':'Yayınla','wizard.deployProgress':'Yayınlanıyor...',
     'wizard.summary':'Özet','wizard.yamlPreview':'YAML Önizleme','wizard.yamlHint':'Alanları doldurunca önizleme burada görünecek',
     'wizard.namePlaceholder':'örn: My Service','wizard.imagePlaceholder':'örn: nginx:latest','wizard.descPlaceholder':'Servis açıklaması',
     // Editor
     'editor.title':'Servis Düzenle','editor.addTitle':'Yeni Servis Ekle','editor.info':'Servis Bilgileri',
     'editor.name':'Ad','editor.desc':'Açıklama','editor.icon':'İkon URL','editor.color':'Renk',
-    'editor.container':'Container Adı','editor.preferPort':'PreferPort','editor.urlPath':'URL Path',
+    'editor.container':'Container Adı','editor.preferPort':'Tercih Portu','editor.urlPath':'URL Yolu',
     'editor.sort':'Sıralama','editor.save':'Kaydet','editor.add':'Ekle','editor.pickIcon':'Seç',
     'editor.config':'Yapılandırma',
     // Containers
@@ -92,7 +92,7 @@ const LANG = {
     'logs.title':'Konteyner Günlükleri','logs.lines':'satır','logs.autoScroll':'Otomatik kaydır','logs.refresh':'Yenile','logs.close':'Kapat',
     'logs.loading':'Günlükler yükleniyor...','logs.error':'Hata: ',
     // Empty states
-    'empty.firstDeploy':'İlk servisinizi deploy edin',
+    'empty.firstDeploy':'İlk servisinizi yayınlayın',
     'empty.firstDeployDesc':"Docker Hub'dan arayın, katalogdan seçin veya manuel olarak yapılandırın.",
     'empty.noMatch':'Aramanızla eşleşen servis bulunamadı','empty.clearSearch':'Aramayı Temizle',
     'filter.all':'Tümü','filter.online':'Çevrimiçi','filter.offline':'Çevrimdışı','filter.clearAll':'Filtreleri Temizle',
@@ -104,7 +104,7 @@ const LANG = {
     // Container detail
     'detail.resources':'Kaynak Kullanımı','detail.info':'Konteyner Bilgisi',
     'detail.created':'Oluşturulma','detail.usage':'Kullanım','detail.temp':'Sıcaklık','detail.power':'Güç',
-    'detail.disk':'Disk','detail.writableLayer':'Yazılabilir katman — Toplam image:',
+    'detail.disk':'Depolama','detail.writableLayer':'Yazılabilir katman — Toplam imaj:',
     'detail.health':'Sağlık','detail.network':'Ağ','detail.blockio':'Disk I/O','detail.pids':'İşlemler',
     // Misc
     'misc.active':'aktif','misc.idle':'boşta','misc.containerActive':'konteyner aktif',
@@ -115,8 +115,8 @@ const LANG = {
     'msg.error':'Hata: ','msg.unknownError':'Bilinmeyen hata',
     'wizard.manualDesc':'Image, port, volume ve environment ayarlarını kendiniz girin.',
     'msg.syncing':'Senkronize ediliyor...',
-    'status.deploying':'Deploy ediliyor','status.deployFailed':'Deploy başarısız',
-    'port.open':'herkese açık','port.closed':'yerel','port.service':'Servis','port.container':'Container','port.access':'Erişim','port.noPorts':'Henüz port bulunamadı. Servis deploy edildiğinde portlar burada görünecek.',
+    'status.deploying':'Yayınlanıyor','status.deployFailed':'Yayınlama başarısız',
+    'port.open':'herkese açık','port.closed':'yerel','port.service':'Servis','port.container':'Konteyner','port.access':'Erişim','port.noPorts':'Henüz port bulunamadı. Servis yayınlandığında portlar burada görünecek.',
     'msg.noPortConfigured':'Port yapılandırılmamış',
     // AI
     'settings.aiConfig':'AI Yapılandırması','settings.aiConfigSub':'Yapay zeka entegrasyon ayarları',
@@ -128,24 +128,24 @@ const LANG = {
     'ai.disabled':'AI özelliği devre dışı. Ayarlardan etkinleştirin.',
     'ai.error':'AI analizi başarısız','ai.retry':'Tekrar Dene',
     'ai.dockerfile':'Oluşturulan Dockerfile','ai.generatedConfig':'Oluşturulan Yapılandırma',
-    'ai.step1':'Proje Seç','ai.step2':'AI Analiz','ai.step3':'İncele','ai.step4':'Deploy',
+    'ai.step1':'Proje Seç','ai.step2':'AI Analiz','ai.step3':'İncele','ai.step4':'Yayınla',
     'ai.scanning':'Taranan dosyalar','ai.goToSettings':'Ayarlara Git',
     // Missing i18n keys
     'status.exited':'Çıkıldı',
     'topbar.reconnecting':'YENİDEN BAĞLANIYOR','topbar.offline':'ÇEVRİMDIŞI',
     'msg.noIcons':'İkon bulunamadı',
     'wizard.buildContext':'Derleme Bağlamı','wizard.buildPlaceholder':'./my-project (image yerine)',
-    'msg.deployingSlug':'deploy ediliyor...','msg.deployOkSlug':'başarıyla deploy edildi','msg.deployFailSlug':'deploy başarısız',
+    'msg.deployingSlug':'yayınlanıyor...','msg.deployOkSlug':'başarıyla yayınlandı','msg.deployFailSlug':'yayınlama başarısız',
     // Health & Settings labels
-    'health.cpu':'CPU','health.memory':'Bellek','health.disk':'Disk','health.networkIo':'Ağ I/O','health.gpu':'GPU',
+    'health.cpu':'CPU','health.memory':'Bellek','health.disk':'Depolama','health.networkIo':'Ağ I/O','health.gpu':'GPU',
     'theme.dark':'Koyu','theme.light':'Açık',
     'settings.on':'Açık','settings.off':'Kapalı',
     'msg.pollingChanged':'Yoklama aralığı',
     // Table headers
-    'table.status':'Durum','table.name':'Ad','table.image':'Image','table.state':'Durum','table.cpu':'CPU',
-    'table.memory':'Bellek','table.ports':'Portlar','table.actions':'İşlemler','table.port':'Port','table.protocol':'Protokol',
+    'table.status':'Durum','table.name':'Ad','table.image':'İmaj','table.state':'Durum','table.cpu':'CPU',
+    'table.memory':'Bellek','table.ports':'Portlar','table.actions':'İşlemler','table.port':'Bağlantı Noktası','table.protocol':'Protokol',
     // Chart
-    'chart.cpu':'CPU (%)','chart.memory':'Bellek (MB)','chart.last':'Son',
+    'chart.cpu':'İşlemci (%)','chart.memory':'Bellek (MB)','chart.last':'Son',
     'msg.maxFileSize':'Maksimum dosya boyutu 512KB',
     // Dashboard stat cards
     'stat.cpu':'CPU','stat.memory':'Bellek','stat.containers':'Containerlar',
@@ -155,11 +155,11 @@ const LANG = {
     // Section headers
     'section.services':'Servisler',
     // Container detail labels
-    'detail.image':'Image','detail.imageId':'Image ID','detail.restart':'Yeniden Başlatma',
+    'detail.image':'İmaj','detail.imageId':'İmaj ID','detail.restart':'Yeniden Başlatma',
     'detail.volumes':'Birimler','detail.policy':'politika',
     // AI Provider
-    'settings.aiProvider':'AI Sağlayıcı','settings.aiBaseUrl':'AI Base URL','settings.aiApiKey':'API Anahtarı',
-    'settings.aiModel':'AI Model','settings.aiEnabled':'AI Etkin',
+    'settings.aiProvider':'AI Sağlayıcı','settings.aiBaseUrl':'AI Temel URL','settings.aiApiKey':'API Anahtarı',
+    'settings.aiModel':'AI Modeli','settings.aiEnabled':'AI Etkin',
     'ai.providerOpenai':'OpenAI','ai.providerGemini':'Google Gemini','ai.providerClaude':'Anthropic Claude','ai.providerCustom':'Özel',
     // Icon picker tabs
     'icon.existing':'Mevcut İkonlar','icon.url':'URL Girişi','icon.upload':'Yükle',
@@ -169,7 +169,7 @@ const LANG = {
     // AI Wizard path
     'ai.pathInput':'Yol girin...','ai.pathPlaceholder':'C:\\Projeler\\my-app veya /home/user/project','ai.home':'Ana Dizin','ai.rootBrowse':'Kök Dizin','ai.projectDetected':'Proje ✓',
     // Editor tabs
-    'editor.settingsTab':'Ayarlar','editor.composeTab':'Docker Compose',
+    'editor.settingsTab':'Ayarlar','editor.composeTab':'Docker Yapılandırma',
     'editor.saveRecreate':'Kaydet & Yeniden Oluştur','editor.aiAssist':'AI Yardım','editor.reset':'Sıfırla',
     'editor.composeLoading':'Compose yükleniyor...','editor.composeSaveOk':'Compose kaydedildi, container yeniden oluşturuluyor...',
     'editor.composeSaveFail':'Compose kaydedilemedi','editor.composeNotFound':'Compose dosyası bulunamadı',
@@ -201,8 +201,8 @@ const LANG = {
     // misc
     'misc.manage':'Yönet',
     // Deploy Panel
-    'deploy.panelTitle':'Deploy Durumu',
-    'deploy.step.build':'Image Alınıyor / Derleniyor...',
+    'deploy.panelTitle':'Yayınlama Durumu',
+    'deploy.step.build':'İmaj Alınıyor / Derleniyor...',
     'deploy.step.start':'Container Başlatılıyor',
     'deploy.step.health':'Sağlık Kontrolü (HTTP)',
     'deploy.step.running':'Çalışıyor ✓',
@@ -217,19 +217,19 @@ const LANG = {
     'deploy.viewLogs':'Logları Gör',
     'deploy.elapsed':'geçen süre',
     'deploy.noHttp':'Container çalışıyor ama HTTP yanıt vermiyor',
-    'deploy.success':'başarıyla deploy edildi',
+    'deploy.success':'başarıyla yayınlandı',
     'deploy.buildFail':'Derleme başarısız',
     'deploy.chatPlaceholder':'AI\'a talimat verin... (örn: portu değiştir, Dockerfile düzelt)',
     'deploy.send':'Gönder',
     'deploy.aiThinking':'AI düşünüyor...',
     'deploy.fixApplying':'Düzeltme uygulanıyor...',
-    'deploy.fixApplied':'Düzeltme uygulandı, yeniden deploy ediliyor...',
+    'deploy.fixApplied':'Düzeltme uygulandı, yeniden yayınlanıyor...',
     'deploy.dockerfileFix':'Dockerfile düzeltildi',
     'deploy.composeFix':'Compose düzeltildi',
     'deploy.maxRetries':'Maksimum deneme sayısına ulaşıldı',
     'wizard.dhPlaceholder':'Docker Hub (ör: nginx, postgres, grafana)',
-    'wizard.hostPort':'Host Port','wizard.containerPort':'Container Port',
-    'wizard.hostPath':'./data','wizard.containerPath':'/data',
+    'wizard.hostPort':'Ana Makine Portu','wizard.containerPort':'Container Portu',
+    'wizard.hostPath':'./veri','wizard.containerPath':'/veri',
     'wizard.envKey':'ANAHTAR','wizard.envValue':'değer',
     'deploy.attempt':'Deneme',
     'deploy.diagnosing':'AI analiz ediyor...',
@@ -497,8 +497,14 @@ function setLang(lang) {
   currentLang = lang;
   localStorage.setItem('lang', lang);
   updateStaticStrings();
-  renderServices(); renderContainers();
-  if ($('#settingsView').classList.contains('active')) renderEnv();
+  // Re-render all dynamic content that uses t()
+  if (typeof setLiveStatus === 'function') setLiveStatus(_liveStatus);
+  if (typeof updateClock === 'function') updateClock();
+  if (typeof updateStats === 'function') updateStats();
+  if (typeof renderServices === 'function') renderServices();
+  if (typeof renderContainers === 'function') renderContainers();
+  if (typeof loadAuditLogs === 'function' && $('#auditlogView').classList.contains('active')) loadAuditLogs();
+  if (typeof renderEnv === 'function' && $('#settingsView').classList.contains('active')) renderEnv();
   // Update lang toggle button text — show the OTHER language (what you'll switch to)
   const langBtn = $('#langToggle');
   if (langBtn) langBtn.textContent = currentLang === 'tr' ? 'EN' : 'TR';

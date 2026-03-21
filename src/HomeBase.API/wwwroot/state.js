@@ -193,7 +193,9 @@ function initSignalR() {
         });
 }
 
+let _liveStatus = 'connected';
 function setLiveStatus(status) {
+    _liveStatus = status;
     const pill = $('#livePill');
     const label = $('#liveLabel');
     if (!pill) return;

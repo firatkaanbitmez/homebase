@@ -367,7 +367,7 @@ function renderServices() {
             }
         } else {
             // Update existing card - skip if state unchanged
-            const stateHash = `${c?.state}_${c?.stats?.cpu}_${c?.stats?.memMB}_${busy}_${svc.deployStatus}`;
+            const stateHash = `${c?.state}_${c?.stats?.cpu}_${c?.stats?.memMB}_${busy}_${svc.deployStatus}_${currentLang}`;
             if (card.dataset.stateHash !== stateHash) {
                 card.className = `svc-card ${up && !stopping ? '' : 'stopped'} ${busy ? 'busy' : ''}`;
                 card.innerHTML = buildCardHtml(svc);
